@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>worldCup — Design Direction Exploration</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F1F5F9; color: #0F172A; }
+
+  /* Navigation */
+  .nav { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #E2E8F0; padding: 16px 24px; z-index: 100; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .nav h1 { font-size: 18px; font-weight: 600; margin-right: 24px; color: #334155; }
+  .nav button { padding: 8px 16px; border: 1px solid #E2E8F0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; font-weight: 500; color: #334155; transition: all 0.15s; }
+  .nav button:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .nav button.active { background: #0F172A; color: #fff; border-color: #0F172A; }
+
+  /* Section Container */
+  .section { display: none; padding: 32px 24px; max-width: 1200px; margin: 0 auto; }
+  .section.active { display: block; }
+  .section-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .section-desc { font-size: 14px; color: #64748B; margin-bottom: 32px; line-height: 1.6; }
+
+  /* Direction Cards */
+  .direction-grid { display: grid; grid-template-columns: 1fr; gap: 48px; }
+
+  .direction-card { background: #fff; border-radius: 12px; border: 1px solid #E2E8F0; overflow: hidden; }
+  .direction-header { padding: 20px 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
+  .direction-header h3 { font-size: 18px; font-weight: 600; }
+  .direction-header .tag { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 100px; background: #F8FAFC; color: #64748B; }
+  .direction-body { padding: 24px; }
+
+  /* Comparison layout */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 768px) { .comparison { grid-template-columns: 1fr; } }
+
+  /* ===================== */
+  /* DIRECTION A: LANDING  */
+  /* ===================== */
+
+  /* Landing A - Centered Minimal */
+  .landing-a { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; text-align: center; background: #fff; padding: 48px 24px; }
+  .landing-a .logo { font-size: 32px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
+  .landing-a .subtitle { font-size: 14px; color: #64748B; margin-bottom: 32px; }
+  .landing-a .input-group { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+  .landing-a input { padding: 14px 16px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 16px; outline: none; text-align: center; }
+  .landing-a input:focus { border-color: #94A3B8; }
+  .landing-a .btn-primary { padding: 14px 16px; background: #0F172A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+  /* Landing B - Card on Background */
+  .landing-b { display: flex; align-items: center; justify-content: center; min-height: 400px; background: #F8FAFC; padding: 48px 24px; }
+  .landing-b .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 40px 32px; text-align: center; width: 100%; max-width: 400px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .landing-b .logo { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  .landing-b .subtitle { font-size: 14px; color: #64748B; margin-bottom: 24px; }
+  .landing-b input { width: 100%; padding: 14px 16px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px; }
+  .landing-b .btn-primary { width: 100%; padding: 14px 16px; background: #0F172A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .landing-b .status { margin-top: 16px; font-size: 12px; color: #94A3B8; }
+
+  /* ======================== */
+  /* DIRECTION: LEADERBOARD   */
+  /* ======================== */
+
+  .mock-view { background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; overflow: hidden; }
+  .mock-header { background: #fff; padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
+  .mock-header h4 { font-size: 18px; font-weight: 600; }
+  .mock-tabs { display: flex; gap: 0; }
+  .mock-tabs button { padding: 8px 14px; border: 1px solid #E2E8F0; background: #fff; font-size: 13px; cursor: pointer; color: #64748B; }
+  .mock-tabs button:first-child { border-radius: 6px 0 0 6px; }
+  .mock-tabs button:last-child { border-radius: 0 6px 6px 0; }
+  .mock-tabs button.active { background: #0F172A; color: #fff; border-color: #0F172A; }
+
+  /* Leaderboard A - Clean Table */
+  .lb-table { width: 100%; border-collapse: collapse; }
+  .lb-table th { text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; background: #F8FAFC; }
+  .lb-table td { padding: 14px 16px; font-size: 15px; border-bottom: 1px solid #F1F5F9; background: #fff; }
+  .lb-table tr:hover td { background: #F8FAFC; }
+  .lb-rank { font-weight: 700; color: #334155; width: 40px; }
+  .lb-name { font-weight: 500; }
+  .lb-score { font-weight: 700; font-size: 18px; }
+  .lb-max { color: #64748B; font-size: 13px; }
+  .lb-champ { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #64748B; }
+  .lb-champ .flag { font-size: 16px; }
+  .lb-eliminated { color: #94A3B8; text-decoration: line-through; }
+  .lb-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 100px; }
+  .lb-badge.elim { background: #FEE2E2; color: #EF4444; }
+  .lb-badge.alive { background: #D1FAE5; color: #059669; }
+  .lb-crown { font-size: 16px; }
+
+  /* Leaderboard B - Card List */
+  .lb-cards { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+  .lb-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 16px; }
+  .lb-card:first-child { border-color: #CBD5E1; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .lb-card-rank { font-size: 20px; font-weight: 700; color: #334155; min-width: 32px; text-align: center; }
+  .lb-card-info { flex: 1; }
+  .lb-card-name { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+  .lb-card-meta { font-size: 13px; color: #64748B; display: flex; gap: 12px; }
+  .lb-card-score { font-size: 22px; font-weight: 700; color: #0F172A; }
+  .lb-card.eliminated { opacity: 0.6; }
+  .lb-card.eliminated .lb-card-name { text-decoration: line-through; color: #94A3B8; }
+
+  /* ======================== */
+  /* DIRECTION: BRACKET       */
+  /* ======================== */
+
+  /* Bracket Desktop - Lines Style */
+  .bracket-desktop { padding: 24px; overflow-x: auto; }
+  .bracket-rounds { display: flex; gap: 0; align-items: flex-start; min-width: 800px; }
+  .bracket-round { display: flex; flex-direction: column; justify-content: space-around; min-width: 160px; position: relative; }
+  .bracket-round-label { font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 16px; }
+  .bracket-match { margin: 8px 0; position: relative; }
+  .bracket-team { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #fff; border: 1px solid #E2E8F0; cursor: pointer; font-size: 14px; transition: all 0.1s; }
+  .bracket-team:first-child { border-radius: 6px 6px 0 0; border-bottom: none; }
+  .bracket-team:last-child { border-radius: 0 0 6px 6px; }
+  .bracket-team:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .bracket-team.selected { background: #F0FDF4; border-color: #10B981; }
+  .bracket-team.correct { background: #D1FAE5; border-color: #10B981; }
+  .bracket-team.wrong { background: #FEE2E2; border-color: #EF4444; color: #94A3B8; text-decoration: line-through; }
+  .bracket-team .flag { font-size: 18px; }
+  .bracket-team .name { flex: 1; font-weight: 500; }
+  .bracket-connector { position: absolute; right: -24px; top: 50%; width: 24px; height: 1px; background: #CBD5E1; }
+
+  /* Bracket Mobile - Round by Round */
+  .bracket-mobile { padding: 16px; max-width: 400px; }
+  .bracket-mobile-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .bracket-mobile-nav h4 { font-size: 16px; font-weight: 600; }
+  .bracket-mobile-nav button { padding: 8px 12px; border: 1px solid #E2E8F0; border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; color: #334155; }
+  .bracket-mobile-matches { display: flex; flex-direction: column; gap: 12px; }
+  .bracket-mobile-match { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; }
+  .bracket-mobile-team { display: flex; align-items: center; gap: 10px; padding: 14px 16px; font-size: 16px; cursor: pointer; transition: background 0.1s; }
+  .bracket-mobile-team:first-child { border-bottom: 1px solid #F1F5F9; }
+  .bracket-mobile-team:hover { background: #F8FAFC; }
+  .bracket-mobile-team.selected { background: #F0FDF4; }
+  .bracket-mobile-team .flag { font-size: 20px; }
+  .bracket-mobile-team .name { flex: 1; font-weight: 500; }
+  .bracket-mobile-team .check { color: #10B981; font-weight: 700; }
+  .bracket-mobile-progress { margin-top: 16px; text-align: center; }
+  .bracket-mobile-progress .counter { font-size: 14px; color: #64748B; margin-bottom: 8px; }
+  .bracket-mobile-progress .bar { height: 4px; background: #E2E8F0; border-radius: 2px; overflow: hidden; }
+  .bracket-mobile-progress .bar-fill { height: 100%; background: #10B981; border-radius: 2px; transition: width 0.3s; }
+
+  /* ======================== */
+  /* DIRECTION: NAVIGATION    */
+  /* ======================== */
+
+  /* Nav A - Top Tabs */
+  .nav-top-demo { background: #fff; border-radius: 8px; border: 1px solid #E2E8F0; overflow: hidden; max-width: 400px; }
+  .nav-top-bar { display: flex; border-bottom: 1px solid #E2E8F0; }
+  .nav-top-bar button { flex: 1; padding: 14px; border: none; background: #fff; font-size: 14px; font-weight: 500; color: #64748B; cursor: pointer; position: relative; }
+  .nav-top-bar button.active { color: #0F172A; font-weight: 600; }
+  .nav-top-bar button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: #0F172A; }
+  .nav-top-content { padding: 24px; min-height: 200px; background: #F8FAFC; font-size: 14px; color: #64748B; text-align: center; display: flex; align-items: center; justify-content: center; }
+
+  /* Nav B - Bottom Tabs (Mobile) */
+  .nav-bottom-demo { background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; overflow: hidden; max-width: 400px; display: flex; flex-direction: column; }
+  .nav-bottom-content { padding: 24px; min-height: 240px; font-size: 14px; color: #64748B; text-align: center; display: flex; align-items: center; justify-content: center; }
+  .nav-bottom-bar { display: flex; background: #fff; border-top: 1px solid #E2E8F0; }
+  .nav-bottom-bar button { flex: 1; padding: 10px; border: none; background: #fff; font-size: 11px; font-weight: 500; color: #94A3B8; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .nav-bottom-bar button .icon { font-size: 20px; }
+  .nav-bottom-bar button.active { color: #0F172A; }
+
+  /* ======================== */
+  /* COMBINED MOCKUP          */
+  /* ======================== */
+  .full-mockup { background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; overflow: hidden; }
+  .full-mockup-header { background: #fff; padding: 12px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
+  .full-mockup-header .app-name { font-size: 16px; font-weight: 700; }
+  .full-mockup-header .user-name { font-size: 13px; color: #64748B; }
+  .full-mockup-body { padding: 0; }
+
+  /* Notes */
+  .direction-notes { margin-top: 16px; padding: 16px; background: #F8FAFC; border-radius: 8px; font-size: 13px; color: #64748B; line-height: 1.6; }
+  .direction-notes strong { color: #334155; }
+
+  .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .pros-cons div { padding: 12px 16px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+  .pros { background: #F0FDF4; color: #065F46; }
+  .cons { background: #FEF2F2; color: #991B1B; }
+  .pros-cons h5 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <h1>worldCup Design Directions</h1>
+  <button class="active" onclick="showSection('landing')">Landing Page</button>
+  <button onclick="showSection('leaderboard')">Leaderboard</button>
+  <button onclick="showSection('bracket')">Bracket</button>
+  <button onclick="showSection('navigation')">Navigation</button>
+  <button onclick="showSection('combined')">Full Mockup</button>
+</div>
+
+<!-- ======================== -->
+<!-- LANDING PAGE DIRECTIONS  -->
+<!-- ======================== -->
+<div class="section active" id="landing">
+  <h2 class="section-title">Landing Page</h2>
+  <p class="section-desc">The first thing users see when they tap the link from group chat. One job: enter a username and get to the bracket.</p>
+
+  <div class="direction-grid">
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Direction A — Pure Minimal</h3>
+        <span class="tag">Recommended</span>
+      </div>
+      <div class="direction-body">
+        <div class="landing-a">
+          <div class="logo">worldCup</div>
+          <div class="subtitle">2026 Bracket Pool</div>
+          <div class="input-group">
+            <input type="text" placeholder="Enter your name" />
+            <button class="btn-primary">Enter</button>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Nothing but the essentials. Logo, subtitle, input, button. Full-screen centered layout creates a focused moment. Zero distraction. The user's eye goes directly to the input field.
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><h5>Strengths</h5>Maximum clarity. Impossible to get confused. Loads instantly. Works on any screen size without adaptation.</div>
+          <div class="cons"><h5>Tradeoffs</h5>No context about the pool status (how many have entered, is bracket locked, etc.). Could feel sparse.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Direction B — Card with Context</h3>
+        <span class="tag">Alternative</span>
+      </div>
+      <div class="direction-body">
+        <div class="landing-b">
+          <div class="card">
+            <div class="logo">worldCup</div>
+            <div class="subtitle">2026 Bracket Pool</div>
+            <input type="text" placeholder="Enter your name" />
+            <button class="btn-primary">Enter</button>
+            <div class="status">8 of 12 brackets submitted &bull; Brackets lock in 14h 23m</div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Same simplicity but wrapped in a card with subtle status context. The "8 of 12 brackets submitted" line adds social proof and urgency. Countdown timer creates healthy pressure during the entry window.
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><h5>Strengths</h5>Adds useful context without cluttering. Social proof motivates completion. Countdown creates urgency during the entry window.</div>
+          <div class="cons"><h5>Tradeoffs</h5>Slightly more complex. Status line needs to be state-aware (different messages for different phases).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== -->
+<!-- LEADERBOARD DIRECTIONS   -->
+<!-- ======================== -->
+<div class="section" id="leaderboard">
+  <h2 class="section-title">Leaderboard</h2>
+  <p class="section-desc">The heartbeat of the app. Where competitive energy lives. Must show rank, score, max possible, champion pick, and elimination status at a glance.</p>
+
+  <div class="direction-grid">
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Direction A — Clean Table</h3>
+        <span class="tag">Recommended</span>
+      </div>
+      <div class="direction-body">
+        <div class="mock-view">
+          <div class="mock-header">
+            <h4>Leaderboard</h4>
+            <div class="mock-tabs">
+              <button class="active">Standings</button>
+              <button>My Bracket</button>
+            </div>
+          </div>
+          <table class="lb-table">
+            <thead>
+              <tr><th></th><th>Name</th><th>Score</th><th>Max</th><th>Champion</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="lb-rank"><span class="lb-crown">👑</span> 1</td>
+                <td class="lb-name">Mike</td>
+                <td class="lb-score">38</td>
+                <td class="lb-max">62</td>
+                <td class="lb-champ"><span class="flag">🇧🇷</span> Brazil</td>
+                <td><span class="lb-badge alive">IN IT</span></td>
+              </tr>
+              <tr>
+                <td class="lb-rank">2</td>
+                <td class="lb-name">Sarah</td>
+                <td class="lb-score">35</td>
+                <td class="lb-max">59</td>
+                <td class="lb-champ"><span class="flag">🇫🇷</span> France</td>
+                <td><span class="lb-badge alive">IN IT</span></td>
+              </tr>
+              <tr>
+                <td class="lb-rank">3</td>
+                <td class="lb-name">Chris</td>
+                <td class="lb-score">34</td>
+                <td class="lb-max">54</td>
+                <td class="lb-champ"><span class="flag">🇦🇷</span> Argentina</td>
+                <td><span class="lb-badge alive">IN IT</span></td>
+              </tr>
+              <tr>
+                <td class="lb-rank">4</td>
+                <td class="lb-name">Jake</td>
+                <td class="lb-score">31</td>
+                <td class="lb-max">47</td>
+                <td class="lb-champ"><span class="flag">🇩🇪</span> Germany</td>
+                <td><span class="lb-badge alive">IN IT</span></td>
+              </tr>
+              <tr>
+                <td class="lb-rank">5</td>
+                <td class="lb-name">Dan</td>
+                <td class="lb-score">28</td>
+                <td class="lb-max">36</td>
+                <td class="lb-champ"><span class="flag">🇪🇸</span> <span class="lb-eliminated">Spain</span></td>
+                <td><span class="lb-badge elim">OUT</span></td>
+              </tr>
+              <tr>
+                <td class="lb-rank">6</td>
+                <td class="lb-name">Tom</td>
+                <td class="lb-score">26</td>
+                <td class="lb-max">34</td>
+                <td class="lb-champ"><span class="flag">🇬🇧</span> England</td>
+                <td><span class="lb-badge alive">IN IT</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Traditional table layout. Dense but readable. Every data point visible in columns. Scan vertically for rank, horizontally for detail. Crown icon on #1. "IN IT" / "OUT" badges for elimination status. Strikethrough on eliminated champion picks.
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><h5>Strengths</h5>Maximum information density. Easy to scan and compare. Familiar format. All 12 users fit on one screen easily.</div>
+          <div class="cons"><h5>Tradeoffs</h5>Can feel clinical. Less visual personality. Column headers take space on mobile.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Direction B — Card List</h3>
+        <span class="tag">Alternative</span>
+      </div>
+      <div class="direction-body">
+        <div class="mock-view">
+          <div class="mock-header">
+            <h4>Leaderboard</h4>
+            <div class="mock-tabs">
+              <button class="active">Standings</button>
+              <button>My Bracket</button>
+            </div>
+          </div>
+          <div class="lb-cards">
+            <div class="lb-card">
+              <div class="lb-card-rank"><span class="lb-crown">👑</span> 1</div>
+              <div class="lb-card-info">
+                <div class="lb-card-name">Mike</div>
+                <div class="lb-card-meta">
+                  <span>Max: 62</span>
+                  <span>🇧🇷 Brazil</span>
+                  <span class="lb-badge alive">IN IT</span>
+                </div>
+              </div>
+              <div class="lb-card-score">38</div>
+            </div>
+            <div class="lb-card">
+              <div class="lb-card-rank">2</div>
+              <div class="lb-card-info">
+                <div class="lb-card-name">Sarah</div>
+                <div class="lb-card-meta">
+                  <span>Max: 59</span>
+                  <span>🇫🇷 France</span>
+                  <span class="lb-badge alive">IN IT</span>
+                </div>
+              </div>
+              <div class="lb-card-score">35</div>
+            </div>
+            <div class="lb-card">
+              <div class="lb-card-rank">3</div>
+              <div class="lb-card-info">
+                <div class="lb-card-name">Chris</div>
+                <div class="lb-card-meta">
+                  <span>Max: 54</span>
+                  <span>🇦🇷 Argentina</span>
+                  <span class="lb-badge alive">IN IT</span>
+                </div>
+              </div>
+              <div class="lb-card-score">34</div>
+            </div>
+            <div class="lb-card">
+              <div class="lb-card-rank">4</div>
+              <div class="lb-card-info">
+                <div class="lb-card-name">Jake</div>
+                <div class="lb-card-meta">
+                  <span>Max: 47</span>
+                  <span>🇩🇪 Germany</span>
+                  <span class="lb-badge alive">IN IT</span>
+                </div>
+              </div>
+              <div class="lb-card-score">31</div>
+            </div>
+            <div class="lb-card eliminated">
+              <div class="lb-card-rank">5</div>
+              <div class="lb-card-info">
+                <div class="lb-card-name">Dan</div>
+                <div class="lb-card-meta">
+                  <span>Max: 36</span>
+                  <span>🇪🇸 <s>Spain</s></span>
+                  <span class="lb-badge elim">OUT</span>
+                </div>
+              </div>
+              <div class="lb-card-score">28</div>
+            </div>
+            <div class="lb-card">
+              <div class="lb-card-rank">6</div>
+              <div class="lb-card-info">
+                <div class="lb-card-name">Tom</div>
+                <div class="lb-card-meta">
+                  <span>Max: 34</span>
+                  <span>🇬🇧 England</span>
+                  <span class="lb-badge alive">IN IT</span>
+                </div>
+              </div>
+              <div class="lb-card-score">26</div>
+            </div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Each participant gets their own card row. Score is large and right-aligned for quick scanning. Meta info (max points, champion, status) grouped on a secondary line. Eliminated users fade to reduced opacity. More spacious and touch-friendly than a table.
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><h5>Strengths</h5>More spacious. Better touch targets. Score prominence. Each user feels like a distinct entity. Works better on mobile.</div>
+          <div class="cons"><h5>Tradeoffs</h5>Takes more vertical space (may need scrolling for all 12 on smaller phones). Harder to compare columns at a glance.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== -->
+<!-- BRACKET DIRECTIONS       -->
+<!-- ======================== -->
+<div class="section" id="bracket">
+  <h2 class="section-title">Bracket View</h2>
+  <p class="section-desc">The defining interaction. Desktop shows the full tree; mobile shows round-by-round. These mockups show both approaches.</p>
+
+  <div class="direction-grid">
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Desktop — Full Bracket Tree</h3>
+        <span class="tag">Desktop</span>
+      </div>
+      <div class="direction-body">
+        <div class="mock-view">
+          <div class="mock-header">
+            <h4>Your Bracket</h4>
+            <div style="font-size:14px;color:#64748B;">17 of 31 picks made</div>
+          </div>
+          <div class="bracket-desktop">
+            <div class="bracket-rounds">
+              <div class="bracket-round">
+                <div class="bracket-round-label">Round of 32</div>
+                <div class="bracket-match">
+                  <div class="bracket-team selected"><span class="flag">🇧🇷</span><span class="name">Brazil</span></div>
+                  <div class="bracket-team"><span class="flag">🇰🇷</span><span class="name">South Korea</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team"><span class="flag">🇯🇵</span><span class="name">Japan</span></div>
+                  <div class="bracket-team selected"><span class="flag">🇩🇪</span><span class="name">Germany</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team selected"><span class="flag">🇫🇷</span><span class="name">France</span></div>
+                  <div class="bracket-team"><span class="flag">🇲🇽</span><span class="name">Mexico</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team selected"><span class="flag">🇦🇷</span><span class="name">Argentina</span></div>
+                  <div class="bracket-team"><span class="flag">🇳🇬</span><span class="name">Nigeria</span></div>
+                </div>
+              </div>
+              <div class="bracket-round" style="margin-top: 28px;">
+                <div class="bracket-round-label">Round of 16</div>
+                <div class="bracket-match">
+                  <div class="bracket-team selected"><span class="flag">🇧🇷</span><span class="name">Brazil</span></div>
+                  <div class="bracket-team"><span class="flag">🇩🇪</span><span class="name">Germany</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team"><span class="flag">🇫🇷</span><span class="name">France</span></div>
+                  <div class="bracket-team selected"><span class="flag">🇦🇷</span><span class="name">Argentina</span></div>
+                </div>
+              </div>
+              <div class="bracket-round" style="margin-top: 72px;">
+                <div class="bracket-round-label">Quarterfinal</div>
+                <div class="bracket-match">
+                  <div class="bracket-team"><span class="flag">🇧🇷</span><span class="name">Brazil</span></div>
+                  <div class="bracket-team"><span class="flag">🇦🇷</span><span class="name">Argentina</span></div>
+                </div>
+              </div>
+              <div class="bracket-round" style="margin-top: 100px;">
+                <div class="bracket-round-label">Champion</div>
+                <div class="bracket-match">
+                  <div class="bracket-team" style="border-radius:6px;border:1px solid #E2E8F0;opacity:0.5;"><span class="flag" style="opacity:0.3;">🏆</span><span class="name" style="color:#94A3B8;">Pick winner</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Classic horizontal bracket tree. Rounds flow left to right, converging toward the champion. Selected picks highlighted with green-tinted background. Each team is a tappable row with flag + name. The visual shape of the bracket tells the story.
+        </div>
+      </div>
+    </div>
+
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Mobile — Round by Round</h3>
+        <span class="tag">Mobile</span>
+      </div>
+      <div class="direction-body">
+        <div class="comparison">
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#64748B;">During Entry</h4>
+            <div class="mock-view">
+              <div class="bracket-mobile">
+                <div class="bracket-mobile-nav">
+                  <button>← R32</button>
+                  <h4>Round of 16</h4>
+                  <button>QF →</button>
+                </div>
+                <div class="bracket-mobile-matches">
+                  <div class="bracket-mobile-match">
+                    <div class="bracket-mobile-team selected">
+                      <span class="flag">🇧🇷</span>
+                      <span class="name">Brazil</span>
+                      <span class="check">✓</span>
+                    </div>
+                    <div class="bracket-mobile-team">
+                      <span class="flag">🇩🇪</span>
+                      <span class="name">Germany</span>
+                    </div>
+                  </div>
+                  <div class="bracket-mobile-match">
+                    <div class="bracket-mobile-team">
+                      <span class="flag">🇫🇷</span>
+                      <span class="name">France</span>
+                    </div>
+                    <div class="bracket-mobile-team selected">
+                      <span class="flag">🇦🇷</span>
+                      <span class="name">Argentina</span>
+                      <span class="check">✓</span>
+                    </div>
+                  </div>
+                  <div class="bracket-mobile-match">
+                    <div class="bracket-mobile-team">
+                      <span class="flag">🇬🇧</span>
+                      <span class="name">England</span>
+                    </div>
+                    <div class="bracket-mobile-team">
+                      <span class="flag">🇳🇱</span>
+                      <span class="name">Netherlands</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="bracket-mobile-progress">
+                  <div class="counter">17 of 31 picks made</div>
+                  <div class="bar"><div class="bar-fill" style="width:55%"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#64748B;">After Results</h4>
+            <div class="mock-view">
+              <div class="bracket-mobile">
+                <div class="bracket-mobile-nav">
+                  <button>← R32</button>
+                  <h4>Round of 16</h4>
+                  <button>QF →</button>
+                </div>
+                <div class="bracket-mobile-matches">
+                  <div class="bracket-mobile-match">
+                    <div class="bracket-mobile-team" style="background:#D1FAE5;">
+                      <span class="flag">🇧🇷</span>
+                      <span class="name" style="color:#065F46;">Brazil</span>
+                      <span style="color:#10B981;font-weight:700;">✓</span>
+                    </div>
+                    <div class="bracket-mobile-team" style="opacity:0.5;">
+                      <span class="flag">🇩🇪</span>
+                      <span class="name">Germany</span>
+                    </div>
+                  </div>
+                  <div class="bracket-mobile-match">
+                    <div class="bracket-mobile-team" style="opacity:0.5;">
+                      <span class="flag">🇫🇷</span>
+                      <span class="name">France</span>
+                    </div>
+                    <div class="bracket-mobile-team" style="background:#FEE2E2;">
+                      <span class="flag">🇦🇷</span>
+                      <span class="name" style="color:#991B1B;text-decoration:line-through;">Argentina</span>
+                      <span style="color:#EF4444;font-weight:700;">✗</span>
+                    </div>
+                  </div>
+                  <div class="bracket-mobile-match">
+                    <div class="bracket-mobile-team">
+                      <span class="flag">🇬🇧</span>
+                      <span class="name" style="color:#94A3B8;">England</span>
+                    </div>
+                    <div class="bracket-mobile-team">
+                      <span class="flag">🇳🇱</span>
+                      <span class="name" style="color:#94A3B8;">Netherlands</span>
+                      <span style="color:#94A3B8;font-size:12px;">Pending</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="bracket-mobile-progress">
+                  <div class="counter" style="color:#334155;font-weight:500;">Score: 34 pts &bull; Max possible: 54</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> One round at a time with left/right navigation between rounds. Large tappable match cards with generous padding. Progress bar during entry, score summary after results. Left shows entry state (selected picks with checkmarks), right shows results state (green correct, red wrong, gray pending).
+        </div>
+      </div>
+    </div>
+
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Results View — Color-Coded Bracket (Desktop)</h3>
+        <span class="tag">Post-Results</span>
+      </div>
+      <div class="direction-body">
+        <div class="mock-view">
+          <div class="mock-header">
+            <h4>Your Bracket</h4>
+            <div style="font-size:14px;color:#334155;font-weight:600;">Score: 34 &bull; Max: 54</div>
+          </div>
+          <div class="bracket-desktop">
+            <div class="bracket-rounds">
+              <div class="bracket-round">
+                <div class="bracket-round-label">Round of 32</div>
+                <div class="bracket-match">
+                  <div class="bracket-team correct"><span class="flag">🇧🇷</span><span class="name">Brazil</span><span style="color:#10B981;margin-left:auto;">✓</span></div>
+                  <div class="bracket-team" style="opacity:0.4;"><span class="flag">🇰🇷</span><span class="name">South Korea</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team" style="opacity:0.4;"><span class="flag">🇯🇵</span><span class="name">Japan</span></div>
+                  <div class="bracket-team wrong"><span class="flag">🇩🇪</span><span class="name" style="text-decoration:line-through;">Germany</span><span style="color:#EF4444;margin-left:auto;">✗</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team correct"><span class="flag">🇫🇷</span><span class="name">France</span><span style="color:#10B981;margin-left:auto;">✓</span></div>
+                  <div class="bracket-team" style="opacity:0.4;"><span class="flag">🇲🇽</span><span class="name">Mexico</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team correct"><span class="flag">🇦🇷</span><span class="name">Argentina</span><span style="color:#10B981;margin-left:auto;">✓</span></div>
+                  <div class="bracket-team" style="opacity:0.4;"><span class="flag">🇳🇬</span><span class="name">Nigeria</span></div>
+                </div>
+              </div>
+              <div class="bracket-round" style="margin-top: 28px;">
+                <div class="bracket-round-label">Round of 16</div>
+                <div class="bracket-match">
+                  <div class="bracket-team correct"><span class="flag">🇧🇷</span><span class="name">Brazil</span><span style="color:#10B981;margin-left:auto;">✓</span></div>
+                  <div class="bracket-team wrong"><span class="flag">🇩🇪</span><span class="name" style="text-decoration:line-through;">Germany</span><span style="color:#EF4444;margin-left:auto;">✗</span></div>
+                </div>
+                <div class="bracket-match">
+                  <div class="bracket-team" style="background:#F8FAFC;"><span class="flag">🇫🇷</span><span class="name" style="color:#94A3B8;">France</span></div>
+                  <div class="bracket-team" style="background:#F8FAFC;"><span class="flag">🇦🇷</span><span class="name" style="color:#94A3B8;">Argentina</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Same bracket tree layout, now color-coded with results. Green background + checkmark for correct picks. Red background + strikethrough + X for wrong picks. Gray/muted for unplayed matches. Losers of each matchup fade to low opacity. The bracket becomes a visual scorecard — you can see the story of your tournament at a glance.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== -->
+<!-- NAVIGATION DIRECTIONS    -->
+<!-- ======================== -->
+<div class="section" id="navigation">
+  <h2 class="section-title">Navigation Pattern</h2>
+  <p class="section-desc">How users move between the three core views: Leaderboard, Bracket, and Admin (admin only). Simple toggle between two or three views.</p>
+
+  <div class="direction-grid">
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Direction A — Top Tabs</h3>
+        <span class="tag">Recommended</span>
+      </div>
+      <div class="direction-body">
+        <div class="comparison">
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#64748B;">Participant View</h4>
+            <div class="nav-top-demo">
+              <div class="nav-top-bar">
+                <button class="active">Leaderboard</button>
+                <button>My Bracket</button>
+              </div>
+              <div class="nav-top-content">Leaderboard content here</div>
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#64748B;">Admin View</h4>
+            <div class="nav-top-demo">
+              <div class="nav-top-bar">
+                <button class="active">Leaderboard</button>
+                <button>My Bracket</button>
+                <button>Admin</button>
+              </div>
+              <div class="nav-top-content">Leaderboard content here</div>
+            </div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Simple top tab bar below the app header. Two tabs for participants (Leaderboard, My Bracket). Three tabs for admin (adds Admin tab). Underline indicator on active tab. Clean, minimal, familiar pattern.
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><h5>Strengths</h5>Simple. Familiar web pattern. Admin tab only appears for admin user — no clutter for participants. Works identically on desktop and mobile.</div>
+          <div class="cons"><h5>Tradeoffs</h5>Top of screen is less thumb-friendly on tall phones. Takes vertical space from content.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Direction B — Bottom Tab Bar (Mobile) / Top (Desktop)</h3>
+        <span class="tag">Alternative</span>
+      </div>
+      <div class="direction-body">
+        <div class="comparison">
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#64748B;">Mobile — Bottom Bar</h4>
+            <div class="nav-bottom-demo">
+              <div class="nav-bottom-content">Leaderboard content here</div>
+              <div class="nav-bottom-bar">
+                <button class="active"><span class="icon">📊</span>Standings</button>
+                <button><span class="icon">🏆</span>Bracket</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#64748B;">Mobile — Admin</h4>
+            <div class="nav-bottom-demo">
+              <div class="nav-bottom-content">Leaderboard content here</div>
+              <div class="nav-bottom-bar">
+                <button class="active"><span class="icon">📊</span>Standings</button>
+                <button><span class="icon">🏆</span>Bracket</button>
+                <button><span class="icon">⚙️</span>Admin</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="direction-notes">
+          <strong>Approach:</strong> Bottom tab bar on mobile (thumb-friendly), top tabs on desktop. Icons + labels for quick recognition. Switches to top tabs automatically on desktop breakpoint. Native app feel on mobile.
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><h5>Strengths</h5>Thumb-friendly on mobile. Native app feel. Icons add visual recognition. Always visible, never scrolled away.</div>
+          <div class="cons"><h5>Tradeoffs</h5>Slightly more complex (two navigation patterns for responsive). Bottom bar takes space from bracket view on mobile. Icons add visual noise for a 2-tab app.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== -->
+<!-- COMBINED FULL MOCKUP     -->
+<!-- ======================== -->
+<div class="section" id="combined">
+  <h2 class="section-title">Recommended Full Mockup</h2>
+  <p class="section-desc">The recommended direction combined: Pure minimal landing, clean table leaderboard, top tab navigation, classic bracket tree (desktop) / round-by-round (mobile).</p>
+
+  <div class="direction-grid">
+    <div class="direction-card">
+      <div class="direction-header">
+        <h3>Landing → Leaderboard → Bracket (Desktop Flow)</h3>
+        <span class="tag">Recommended</span>
+      </div>
+      <div class="direction-body">
+        <div style="display:flex;flex-direction:column;gap:24px;">
+          <!-- Landing -->
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:8px;color:#64748B;">1. Landing</h4>
+            <div class="landing-b" style="min-height:200px;border-radius:8px;border:1px solid #E2E8F0;">
+              <div class="card" style="padding:24px;">
+                <div class="logo" style="font-size:22px;">worldCup</div>
+                <div class="subtitle" style="margin-bottom:16px;">2026 Bracket Pool</div>
+                <input type="text" placeholder="Enter your name" style="margin-bottom:8px;" />
+                <button class="btn-primary">Enter</button>
+                <div class="status">8 of 12 brackets submitted</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Leaderboard -->
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:8px;color:#64748B;">2. Leaderboard (returning user default view)</h4>
+            <div class="full-mockup">
+              <div class="full-mockup-header">
+                <div class="app-name">worldCup 2026</div>
+                <div class="user-name">Chris</div>
+              </div>
+              <div style="background:#fff;border-bottom:1px solid #E2E8F0;">
+                <div class="nav-top-bar" style="max-width:none;">
+                  <button class="active" style="border:none;padding:12px 20px;">Leaderboard</button>
+                  <button style="border:none;padding:12px 20px;">My Bracket</button>
+                </div>
+              </div>
+              <table class="lb-table" style="font-size:14px;">
+                <thead><tr><th></th><th>Name</th><th>Score</th><th>Max</th><th>Champion</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="lb-rank"><span class="lb-crown">👑</span> 1</td><td class="lb-name">Mike</td><td class="lb-score" style="font-size:16px;">38</td><td class="lb-max">62</td><td class="lb-champ"><span class="flag">🇧🇷</span> Brazil</td><td><span class="lb-badge alive">IN IT</span></td></tr>
+                  <tr><td class="lb-rank">2</td><td class="lb-name">Sarah</td><td class="lb-score" style="font-size:16px;">35</td><td class="lb-max">59</td><td class="lb-champ"><span class="flag">🇫🇷</span> France</td><td><span class="lb-badge alive">IN IT</span></td></tr>
+                  <tr style="background:#F0FDF4;"><td class="lb-rank">3</td><td class="lb-name" style="font-weight:700;">Chris (you)</td><td class="lb-score" style="font-size:16px;">34</td><td class="lb-max">54</td><td class="lb-champ"><span class="flag">🇦🇷</span> Argentina</td><td><span class="lb-badge alive">IN IT</span></td></tr>
+                  <tr><td class="lb-rank">4</td><td class="lb-name">Jake</td><td class="lb-score" style="font-size:16px;">31</td><td class="lb-max">47</td><td class="lb-champ"><span class="flag">🇩🇪</span> Germany</td><td><span class="lb-badge alive">IN IT</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Bracket -->
+          <div>
+            <h4 style="font-size:14px;font-weight:600;margin-bottom:8px;color:#64748B;">3. Bracket (My Bracket tab)</h4>
+            <div class="full-mockup">
+              <div class="full-mockup-header">
+                <div class="app-name">worldCup 2026</div>
+                <div class="user-name">Chris &bull; Score: 34 &bull; Max: 54</div>
+              </div>
+              <div style="background:#fff;border-bottom:1px solid #E2E8F0;">
+                <div class="nav-top-bar" style="max-width:none;">
+                  <button style="border:none;padding:12px 20px;">Leaderboard</button>
+                  <button class="active" style="border:none;padding:12px 20px;">My Bracket</button>
+                </div>
+              </div>
+              <div class="bracket-desktop">
+                <div class="bracket-rounds">
+                  <div class="bracket-round">
+                    <div class="bracket-round-label">Round of 32</div>
+                    <div class="bracket-match">
+                      <div class="bracket-team correct"><span class="flag">🇧🇷</span><span class="name">Brazil</span><span style="color:#10B981;margin-left:auto;">✓</span></div>
+                      <div class="bracket-team" style="opacity:0.4;"><span class="flag">🇰🇷</span><span class="name">S. Korea</span></div>
+                    </div>
+                    <div class="bracket-match">
+                      <div class="bracket-team" style="opacity:0.4;"><span class="flag">🇯🇵</span><span class="name">Japan</span></div>
+                      <div class="bracket-team wrong"><span class="flag">🇩🇪</span><span class="name" style="text-decoration:line-through;">Germany</span><span style="color:#EF4444;margin-left:auto;">✗</span></div>
+                    </div>
+                  </div>
+                  <div class="bracket-round" style="margin-top:28px;">
+                    <div class="bracket-round-label">Round of 16</div>
+                    <div class="bracket-match">
+                      <div class="bracket-team correct"><span class="flag">🇧🇷</span><span class="name">Brazil</span><span style="color:#10B981;margin-left:auto;">✓</span></div>
+                      <div class="bracket-team wrong"><span class="flag">🇩🇪</span><span class="name" style="text-decoration:line-through;">Germany</span><span style="color:#EF4444;margin-left:auto;">✗</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
