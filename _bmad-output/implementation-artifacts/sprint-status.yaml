@@ -47,7 +47,7 @@ development_status:
   epic-1-retrospective: optional
 
   epic-2: in-progress
-  2-1-admin-page-matchup-setup: ready-for-dev
+  2-1-admin-page-matchup-setup: done
   2-2-bracket-lock-control: ready-for-dev
   epic-2-retrospective: optional
 

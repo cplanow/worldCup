@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -10,3 +10,15 @@ export const users = sqliteTable("users", {
     .notNull()
     .default(false),
 });
+
+export const matches = sqliteTable("matches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamA: text("team_a").notNull(),
+  teamB: text("team_b").notNull(),
+  round: integer("round").notNull(),
+  position: integer("position").notNull(),
+  winner: text("winner"),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("idx_matches_round_position").on(table.round, table.position),
+]);

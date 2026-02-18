@@ -1,6 +1,6 @@
 # Story 2.1: Admin Page & Matchup Setup
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,45 +39,45 @@ so that the tournament bracket is ready for participants to make their picks.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define matches table schema (AC: #4)
-  - [ ] Add `matches` table definition to `src/db/schema.ts`
-  - [ ] Columns: `id` (integer, primary key, autoincrement), `team_a` (text, not null), `team_b` (text, not null), `round` (integer, not null), `position` (integer, not null), `winner` (text, nullable — set when result entered in Epic 5), `created_at` (text, not null, default ISO 8601)
-  - [ ] Add composite index: `idx_matches_round_position` on `(round, position)` for ordered retrieval
-  - [ ] Run `npx drizzle-kit generate` to create migration
-  - [ ] Run `npx drizzle-kit migrate` to apply migration to Turso
+- [x] Task 1: Define matches table schema (AC: #4)
+  - [x] Add `matches` table definition to `src/db/schema.ts`
+  - [x] Columns: `id` (integer, primary key, autoincrement), `team_a` (text, not null), `team_b` (text, not null), `round` (integer, not null), `position` (integer, not null), `winner` (text, nullable — set when result entered in Epic 5), `created_at` (text, not null, default ISO 8601)
+  - [x] Add composite index: `idx_matches_round_position` on `(round, position)` for ordered retrieval
+  - [x] Run `npx drizzle-kit generate` to create migration
+  - [x] Run `npx drizzle-kit migrate` to apply migration to Turso
 
-- [ ] Task 2: Create admin Server Actions for matchup setup (AC: #2, #5)
-  - [ ] Create `src/lib/actions/admin.ts` with `"use server"` directive
-  - [ ] Implement `setupMatchup(data: { teamA: string; teamB: string; position: number }): Promise<ActionResult<{ matchId: number }>>`
+- [x] Task 2: Create admin Server Actions for matchup setup (AC: #2, #5)
+  - [x] Create `src/lib/actions/admin.ts` with `"use server"` directive
+  - [x] Implement `setupMatchup(data: { teamA: string; teamB: string; position: number }): Promise<ActionResult<{ matchId: number }>>`
     - Validate admin identity (check session cookie against `ADMIN_USERNAME`)
     - Validate both team names are non-empty
     - Validate position is 1-16
     - Insert or update match in `matches` table (round = 1, position from input)
     - Return match ID on success
-  - [ ] Implement `getMatches(): Promise<Match[]>` — fetch all matches ordered by round, position
-  - [ ] Implement `deleteMatchup(matchId: number): Promise<ActionResult<null>>` — remove a matchup (admin only)
-  - [ ] All actions verify admin identity before executing
+  - [x] Implement `getMatches(): Promise<Match[]>` — fetch all matches ordered by round, position
+  - [x] Implement `deleteMatchup(matchId: number): Promise<ActionResult<null>>` — remove a matchup (admin only)
+  - [x] All actions verify admin identity before executing
 
-- [ ] Task 3: Build admin matchup setup UI (AC: #1, #5)
-  - [ ] Replace placeholder in `src/app/(app)/admin/page.tsx` with full admin page
-  - [ ] Admin page is a Server Component that:
+- [x] Task 3: Build admin matchup setup UI (AC: #1, #5)
+  - [x] Replace placeholder in `src/app/(app)/admin/page.tsx` with full admin page
+  - [x] Admin page is a Server Component that:
     - Verifies admin identity (redirect non-admin to `/leaderboard`)
     - Fetches existing matches from DB
     - Renders the matchup setup interface
-  - [ ] Create `src/components/admin/MatchupSetup.tsx` (client component for form interaction):
+  - [x] Create `src/components/admin/MatchupSetup.tsx` (client component for form interaction):
     - Display 16 matchup slots numbered 1-16
     - Each slot shows: position number, Team A input, "vs" label, Team B input, Save button
     - Already-saved matchups show team names with an Edit button to modify
     - Progress indicator: "X of 16 matchups configured"
     - All 16 slots always visible — empty ones show input fields, saved ones show team names
-  - [ ] Style per UX spec:
+  - [x] Style per UX spec:
     - Match cards stacked vertically
     - Input fields: 16px font, generous padding
     - Save button per matchup: Slate 900 background, white text
     - Saved matchup: team names displayed with subtle background, Edit button as secondary action
 
-- [ ] Task 4: Add Match type to shared types (AC: #4)
-  - [ ] Add `Match` type to `src/types/index.ts`:
+- [x] Task 4: Add Match type to shared types (AC: #4)
+  - [x] Add `Match` type to `src/types/index.ts`:
     ```typescript
     export type Match = {
       id: number;
@@ -313,10 +313,33 @@ Manual testing checklist:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- Migration `0001_keen_shard.sql` also drops redundant `idx_users_username` index (unique index already covers it)
+- Used `and()` for composite where clause on round+position (story dev notes sample used chained `.where()` which doesn't work with Drizzle)
+
 ### Completion Notes List
 
+- Task 1: Added `matches` table to Drizzle schema with all required columns and composite index. Generated migration `0001_keen_shard.sql` and applied to Turso.
+- Task 2: Created `src/lib/actions/admin.ts` with `verifyAdmin()`, `setupMatchup()`, `getMatches()`, `deleteMatchup()`. All actions verify admin identity. setupMatchup uses upsert pattern (insert or update by round+position). 12 unit tests covering auth, validation, insert, update, trim, getMatches, and delete.
+- Task 3: Replaced admin page placeholder with Server Component that fetches matches and renders `MatchupSetup` client component. MatchupSetup displays 16 numbered slots, progress counter, inline save/edit/delete per matchup, inline error display. Styled per UX spec (Slate 900 save buttons, subtle bg for saved state).
+- Task 4: Added `Match` type to `src/types/index.ts` with all required fields.
+
+### Change Log
+
+- 2026-02-18: Implemented Story 2.1 — all 4 tasks complete, 12 new unit tests, 31 total tests passing
+- 2026-02-18: Code review fixes — 6 issues fixed (3 HIGH, 3 MEDIUM): H1 case-sensitivity in verifyAdmin(), H2 admin check on getMatches(), H3 ActionResult return type for getMatches(), M1 matchId validation in deleteMatchup(), M2 integer validation for position, M3 revalidatePath after mutations. Admin page updated to use getMatches() action instead of direct DB query. 5 new tests added (17 total admin tests, 36 total tests passing).
+
 ### File List
+
+- `src/db/schema.ts` (modified) — added `matches` table with composite index
+- `src/db/migrations/0001_keen_shard.sql` (created) — matches table migration
+- `src/db/migrations/meta/0001_snapshot.json` (created) — migration snapshot
+- `src/db/migrations/meta/_journal.json` (modified) — migration journal updated
+- `src/lib/actions/admin.ts` (created) — setupMatchup, getMatches, deleteMatchup server actions
+- `src/lib/actions/admin.test.ts` (created) — 12 unit tests for admin actions
+- `src/app/(app)/admin/page.tsx` (modified) — replaced placeholder with matchup setup interface
+- `src/components/admin/MatchupSetup.tsx` (created) — client component for 16-matchup form
+- `src/types/index.ts` (modified) — added Match type
