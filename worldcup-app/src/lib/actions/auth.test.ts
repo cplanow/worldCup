@@ -14,7 +14,7 @@ vi.mock("@/db", () => {
   const mockReturning = vi.fn();
   const mockValues = vi.fn(() => ({ returning: mockReturning }));
   const mockWhere = vi.fn(() => ({ get: mockGet }));
-  const mockFrom = vi.fn(() => ({ where: mockWhere }));
+  const mockFrom = vi.fn(() => ({ where: mockWhere, get: mockGet }));
 
   return {
     db: {
@@ -27,6 +27,7 @@ vi.mock("@/db", () => {
 
 vi.mock("@/db/schema", () => ({
   users: { username: "username" },
+  tournamentConfig: { isLocked: "is_locked" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -81,7 +82,8 @@ describe("enterApp", () => {
 
   it("creates new user when username not found", async () => {
     const { mockGet, mockReturning } = await getDbMocks();
-    mockGet.mockResolvedValueOnce(undefined);
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config: no row → defaults unlocked
+    mockGet.mockResolvedValueOnce(undefined); // users: not found
     mockReturning.mockResolvedValueOnce([{ id: 42 }]);
 
     const result = await enterApp("NewUser");
@@ -98,6 +100,7 @@ describe("enterApp", () => {
 
   it("returns existing user when username found", async () => {
     const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
     mockGet.mockResolvedValueOnce({
       id: 5,
       username: "chris",
@@ -118,6 +121,7 @@ describe("enterApp", () => {
 
   it("sets session cookie on successful login", async () => {
     const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
     mockGet.mockResolvedValueOnce({
       id: 1,
       username: "user1",
@@ -138,7 +142,8 @@ describe("enterApp", () => {
 
   it("sets session cookie on new user creation", async () => {
     const { mockGet, mockReturning } = await getDbMocks();
-    mockGet.mockResolvedValueOnce(undefined);
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
+    mockGet.mockResolvedValueOnce(undefined); // users: not found
     mockReturning.mockResolvedValueOnce([{ id: 1 }]);
 
     await enterApp("brand_new");
@@ -153,7 +158,8 @@ describe("enterApp", () => {
 
   it("trims and lowercases username", async () => {
     const { mockGet, mockReturning } = await getDbMocks();
-    mockGet.mockResolvedValueOnce(undefined);
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
+    mockGet.mockResolvedValueOnce(undefined); // users: not found
     mockReturning.mockResolvedValueOnce([{ id: 3 }]);
 
     const result = await enterApp("  TestUser  ");
@@ -167,6 +173,7 @@ describe("enterApp", () => {
   it("identifies admin user correctly (case-insensitive)", async () => {
     process.env.ADMIN_USERNAME = "Admin";
     const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
     mockGet.mockResolvedValueOnce({
       id: 1,
       username: "admin",
@@ -185,6 +192,7 @@ describe("enterApp", () => {
   it("non-admin user is not flagged as admin", async () => {
     process.env.ADMIN_USERNAME = "admin";
     const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
     mockGet.mockResolvedValueOnce({
       id: 2,
       username: "player1",
@@ -200,8 +208,9 @@ describe("enterApp", () => {
     }
   });
 
-  it("defaults isLocked to false", async () => {
+  it("defaults isLocked to false when no tournament config exists", async () => {
     const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config: no row
     mockGet.mockResolvedValueOnce({
       id: 1,
       username: "user1",
@@ -217,8 +226,27 @@ describe("enterApp", () => {
     }
   });
 
+  it("returns isLocked true when tournament config is locked", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ isLocked: true }); // tournament_config: locked
+    mockGet.mockResolvedValueOnce({
+      id: 1,
+      username: "user1",
+      bracketSubmitted: false,
+      createdAt: "2026-01-01",
+    });
+
+    const result = await enterApp("user1");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isLocked).toBe(true);
+    }
+  });
+
   it("handles unique constraint race condition gracefully", async () => {
     const { mockGet, mockValues } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
     // First call: user not found
     mockGet.mockResolvedValueOnce(undefined);
     // Insert fails with UNIQUE constraint
@@ -249,6 +277,7 @@ describe("enterApp", () => {
 
   it("returns generic error for unexpected database failures", async () => {
     const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // tournament_config
     mockGet.mockRejectedValueOnce(new Error("Connection refused"));
 
     const consoleSpy = vi

@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getMatches } from "@/lib/actions/admin";
+import { getMatches, getTournamentConfig } from "@/lib/actions/admin";
 import { MatchupSetup } from "@/components/admin/MatchupSetup";
+import { BracketLockToggle } from "@/components/admin/BracketLockToggle";
 import type { Match } from "@/types";
 
 export default async function AdminPage() {
@@ -15,7 +16,10 @@ export default async function AdminPage() {
     redirect("/leaderboard");
   }
 
-  const result = await getMatches();
+  const [result, config] = await Promise.all([
+    getMatches(),
+    getTournamentConfig(),
+  ]);
   const allMatches: Match[] = result.success ? result.data : [];
 
   return (
@@ -23,7 +27,10 @@ export default async function AdminPage() {
       <h1 className="mb-6 text-2xl font-bold text-slate-900">
         Tournament Setup
       </h1>
-      <MatchupSetup existingMatches={allMatches} />
+      <BracketLockToggle initialLocked={config.isLocked} />
+      <div className="mt-6">
+        <MatchupSetup existingMatches={allMatches} />
+      </div>
     </div>
   );
 }

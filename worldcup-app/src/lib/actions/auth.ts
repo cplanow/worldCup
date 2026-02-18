@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, tournamentConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 
@@ -48,6 +48,9 @@ export async function enterApp(
     };
   }
 
+  const config = await db.select().from(tournamentConfig).get();
+  const isLocked = config?.isLocked ?? false;
+
   try {
     const existing = await db
       .select()
@@ -74,9 +77,6 @@ export async function enterApp(
     }
 
     await setSessionCookie(trimmed);
-
-    // TODO: Check bracket lock status from tournament_config table (Story 2.2)
-    const isLocked = false;
 
     return {
       success: true,
@@ -113,7 +113,7 @@ export async function enterApp(
             username: trimmed,
             bracketSubmitted: existing.bracketSubmitted,
             isAdmin: checkIsAdmin(trimmed),
-            isLocked: false,
+            isLocked,
             isNewUser: false,
           },
         };

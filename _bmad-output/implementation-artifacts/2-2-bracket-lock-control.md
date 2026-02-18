@@ -1,6 +1,6 @@
 # Story 2.2: Bracket Lock Control
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,44 +39,58 @@ so that I can control when the entry window opens and closes.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define tournament_config table schema (AC: #5)
-  - [ ] Add `tournament_config` table definition to `src/db/schema.ts`
-  - [ ] Columns: `id` (integer, primary key, autoincrement), `is_locked` (integer/boolean, not null, default false), `points_r32` (integer, not null, default 1), `points_r16` (integer, not null, default 2), `points_qf` (integer, not null, default 4), `points_sf` (integer, not null, default 8), `points_final` (integer, not null, default 16), `created_at` (text, not null, default ISO 8601)
-  - [ ] Run `npx drizzle-kit generate` to create migration
-  - [ ] Run `npx drizzle-kit migrate` to apply migration
-  - [ ] Seed initial config row (single row table — only one tournament config exists)
+- [x] Task 1: Define tournament_config table schema (AC: #5)
+  - [x] Add `tournament_config` table definition to `src/db/schema.ts`
+  - [x] Columns: `id` (integer, primary key, autoincrement), `is_locked` (integer/boolean, not null, default false), `points_r32` (integer, not null, default 1), `points_r16` (integer, not null, default 2), `points_qf` (integer, not null, default 4), `points_sf` (integer, not null, default 8), `points_final` (integer, not null, default 16), `created_at` (text, not null, default ISO 8601)
+  - [x] Run `npx drizzle-kit generate` to create migration
+  - [x] Run `npx drizzle-kit migrate` to apply migration to Turso
 
-- [ ] Task 2: Create lock control Server Actions (AC: #2, #3, #4)
-  - [ ] Add to `src/lib/actions/admin.ts`:
+- [x] Task 2: Create lock control Server Actions (AC: #2, #3, #4)
+  - [x] Add to `src/lib/actions/admin.ts`:
     - `toggleLock(locked: boolean): Promise<ActionResult<{ isLocked: boolean }>>` — admin-only, updates `is_locked` in tournament_config
     - `getTournamentConfig(): Promise<TournamentConfig>` — fetches config (creates default row if none exists)
-  - [ ] Create shared lock check utility in `src/lib/actions/admin.ts`:
+  - [x] Create shared lock check utility in `src/lib/actions/admin.ts`:
     - `checkBracketLock(): Promise<boolean>` — returns true if locked, false if unlocked
     - This function will be imported by `bracket.ts` actions in Epic 3 for server-side lock enforcement
-  - [ ] All mutation actions verify admin identity via `verifyAdmin()` before executing
+  - [x] All mutation actions verify admin identity via `verifyAdmin()` before executing
+  - [x] `revalidatePath("/admin")` after toggling lock
+  - [x] Write unit tests in `src/lib/actions/admin.test.ts` (extend existing test file):
+    - Test toggleLock rejects non-admin
+    - Test toggleLock sets is_locked to true
+    - Test toggleLock sets is_locked to false
+    - Test getTournamentConfig creates default row if none exists
+    - Test getTournamentConfig returns existing config
+    - Test checkBracketLock returns correct status
 
-- [ ] Task 3: Build bracket lock toggle UI (AC: #1)
-  - [ ] Create `src/components/admin/BracketLockToggle.tsx` (client component)
-  - [ ] Use shadcn/ui `Switch` component
-  - [ ] Display: "Bracket Entry" label, Switch toggle, current status text ("Locked" / "Unlocked")
-  - [ ] On toggle: call `toggleLock()` Server Action, update UI optimistically
-  - [ ] Show lock status with visual distinction:
-    - Unlocked: green accent, "Brackets are open for entry"
-    - Locked: red accent, "Brackets are locked — no new picks allowed"
-  - [ ] Loading state: disable Switch during Server Action execution
+- [x] Task 3: Build BracketLockToggle UI component (AC: #1)
+  - [x] Create `src/components/admin/BracketLockToggle.tsx` (client component with `"use client"`)
+  - [x] Use shadcn/ui `Switch` component
+  - [x] Props: `initialLocked: boolean`
+  - [x] Display layout:
+    - "Bracket Entry Control" section heading
+    - Switch toggle with label
+    - Status text: "Brackets are open for entry" (unlocked) or "Brackets are locked — no new picks allowed" (locked)
+  - [x] On toggle: call `toggleLock()` Server Action with optimistic UI
+  - [x] Loading state: disable Switch during Server Action execution
+  - [x] Error handling: revert Switch position on failure, show inline error
 
-- [ ] Task 4: Add BracketLockToggle to admin page (AC: #1)
-  - [ ] Update `src/app/(app)/admin/page.tsx` to include BracketLockToggle above the matchup setup
-  - [ ] Fetch tournament config in the Server Component and pass `isLocked` as prop
-  - [ ] Admin page layout: Lock control section at top, matchup setup section below
+- [x] Task 4: Integrate BracketLockToggle into admin page (AC: #1)
+  - [x] Update `src/app/(app)/admin/page.tsx`:
+    - Fetch tournament config via `getTournamentConfig()`
+    - Render BracketLockToggle above MatchupSetup with `isLocked` prop
+    - Section separator between lock control and matchup setup
 
-- [ ] Task 5: Update enterApp to use real lock status (AC: #4)
-  - [ ] Update `enterApp()` in `src/lib/actions/auth.ts` to query `tournament_config` for real `is_locked` value
-  - [ ] Remove the TODO/try-catch placeholder from Story 1.3
-  - [ ] Import `tournamentConfig` from `@/db/schema` and query it properly
+- [x] Task 5: Update enterApp to use real lock status (AC: #4)
+  - [x] Update `src/lib/actions/auth.ts`:
+    - Import `tournamentConfig` from `@/db/schema`
+    - Replace the TODO placeholder at line 78-79 (`const isLocked = false;`) with real DB query
+    - ALSO update the race condition catch block at line 111 (`isLocked: false`) — same fix needed there
+    - Query `tournament_config` table for `is_locked` value
+    - Default to `false` if no config row exists yet
+    - Move the lock query BEFORE the try block so both paths use it
 
-- [ ] Task 6: Add TournamentConfig type to shared types (AC: #5)
-  - [ ] Add `TournamentConfig` type to `src/types/index.ts`:
+- [x] Task 6: Add TournamentConfig type (AC: #5)
+  - [x] Add to `src/types/index.ts`:
     ```typescript
     export type TournamentConfig = {
       id: number;
@@ -94,15 +108,17 @@ so that I can control when the entry window opens and closes.
 
 ### Architecture Compliance
 
-- **Server Actions location:** `src/lib/actions/admin.ts` — extend existing file from Story 2.1
+- **Server Actions location:** `src/lib/actions/admin.ts` — extend existing file from Story 2.1, keep all admin actions together
 - **Component location:** `src/components/admin/BracketLockToggle.tsx` — per architecture's feature-grouped structure
+- **Server Action return shape:** MUST use `ActionResult<T>` from `@/lib/actions/types` for all mutations
 - **Lock enforcement is server-side:** Per NFR6, bracket lock enforcement is absolute — no race conditions. The client can show lock state, but the server MUST reject mutations when locked. Never rely on client-side lock checks alone.
-- **Single-row config table:** `tournament_config` always has exactly one row. Use upsert or "get or create" pattern.
+- **Single-row config table:** `tournament_config` always has exactly one row. Use get-or-create pattern (not upsert).
+- **Validation order in Server Actions:** Check admin identity first → validate input → perform mutation → revalidatePath → return result
 
 ### Database Schema Details
 
 ```typescript
-// Add to src/db/schema.ts
+// Add to src/db/schema.ts alongside existing users and matches tables
 export const tournamentConfig = sqliteTable("tournament_config", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   isLocked: integer("is_locked", { mode: "boolean" }).notNull().default(false),
@@ -116,10 +132,11 @@ export const tournamentConfig = sqliteTable("tournament_config", {
 ```
 
 **Design notes:**
-- Single-row table: only one tournament config exists. All queries use `.get()` (returns first row).
-- Point values stored here so admin can configure scoring before brackets open (FR24).
+- Single-row table: only one tournament config exists. All queries use `.get()` (returns first row or undefined).
+- Point values stored here so admin can configure scoring before brackets open (FR24). Default values: R32=1, R16=2, QF=4, SF=8, Final=16.
 - Point values are NOT changed after brackets are submitted — they're set once during setup.
-- `is_locked` is the only column that changes during tournament lifecycle.
+- `is_locked` is the only column that changes during tournament lifecycle (toggled by admin).
+- The `mode: "boolean"` on `is_locked` makes Drizzle automatically map SQLite integer 0/1 to TypeScript boolean.
 
 ### Get-or-Create Pattern for Config
 
@@ -129,7 +146,7 @@ export async function getTournamentConfig(): Promise<TournamentConfig> {
   let config = await db.select().from(tournamentConfig).get();
 
   if (!config) {
-    // Create default config row
+    // Create default config row (unlocked, default point values)
     const result = await db.insert(tournamentConfig).values({}).returning();
     config = result[0];
   }
@@ -147,6 +164,8 @@ export async function getTournamentConfig(): Promise<TournamentConfig> {
 }
 ```
 
+**IMPORTANT:** `getTournamentConfig()` does NOT require admin auth — it's a read operation used by both admin page AND `enterApp()` for any user. Only `toggleLock()` requires admin auth.
+
 ### Lock Toggle Server Action
 
 ```typescript
@@ -162,11 +181,12 @@ export async function toggleLock(locked: boolean): Promise<ActionResult<{ isLock
     .set({ isLocked: locked })
     .where(eq(tournamentConfig.id, config.id));
 
+  revalidatePath("/admin");
   return { success: true, data: { isLocked: locked } };
 }
 ```
 
-### Shared Lock Check for Other Actions
+### Shared Lock Check for Future Actions
 
 ```typescript
 // Export this for use by bracket.ts actions in Epic 3
@@ -182,7 +202,7 @@ export async function checkBracketLock(): Promise<boolean> {
 import { checkBracketLock } from "@/lib/actions/admin";
 
 export async function savePick(...) {
-  // Step 1: Check lock status FIRST (per validation order)
+  // Step 1: Check lock status FIRST (per validation order from architecture)
   if (await checkBracketLock()) {
     return { success: false, error: "Brackets are locked" };
   }
@@ -192,110 +212,192 @@ export async function savePick(...) {
 
 ### Updating enterApp() in auth.ts
 
-Story 1.3 left a TODO placeholder for lock status checking. Replace it:
+Story 1.3 left a placeholder for lock status checking in `enterApp()`. This story replaces it with a real database query.
+
+**TWO locations need updating in `auth.ts`:**
+1. Line 78-79: `// TODO: Check bracket lock status from tournament_config table (Story 2.2)` + `const isLocked = false;`
+2. Line 111: `isLocked: false` in the race condition catch block
+
+**Fix approach:** Query lock status once before the try block so both the happy path and race condition path use the real value:
 
 ```typescript
-// In src/lib/actions/auth.ts — update the enterApp function
+// In src/lib/actions/auth.ts — at the top of enterApp(), after validation, BEFORE the try block:
 import { tournamentConfig } from "@/db/schema";
 
-// Replace the try/catch TODO block with:
+// Query lock status once — both paths need it
 const config = await db.select().from(tournamentConfig).get();
 const isLocked = config?.isLocked ?? false;
+
+try {
+  // ... existing user lookup/create logic ...
+  // Use isLocked in both return paths (happy path and race condition catch)
+}
+```
+
+**Note:** Query `tournament_config` directly here (not via `getTournamentConfig()`) to avoid the auto-create side effect in a non-admin context. Just read the value; if no row exists yet, default to unlocked (`false`).
+
+### BracketLockToggle Component Pattern
+
+```typescript
+// src/components/admin/BracketLockToggle.tsx
+"use client";
+
+import { useState } from "react";
+import { Switch } from "@/components/ui/switch";
+import { toggleLock } from "@/lib/actions/admin";
+
+export function BracketLockToggle({ initialLocked }: { initialLocked: boolean }) {
+  const [isLocked, setIsLocked] = useState(initialLocked);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleToggle(checked: boolean) {
+    setIsPending(true);
+    setError(null);
+    setIsLocked(checked); // Optimistic update
+
+    const result = await toggleLock(checked);
+
+    if (!result.success) {
+      setIsLocked(!checked); // Revert on failure
+      setError(result.error);
+    }
+    setIsPending(false);
+  }
+
+  return (
+    <div className="...">
+      <h2>Bracket Entry Control</h2>
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={isLocked}
+          onCheckedChange={handleToggle}
+          disabled={isPending}
+        />
+        <span>{isLocked ? "Brackets are locked" : "Brackets are open for entry"}</span>
+      </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
 ```
 
 ### UX Design Requirements
 
 - **Switch component:** shadcn/ui Switch, standard toggle with label
 - **Visual states:**
-  - Unlocked: switch off position, "Brackets are open for entry" in muted text
-  - Locked: switch on position, "Brackets are locked" with emphasis
+  - Unlocked: switch off position, "Brackets are open for entry" in muted/Slate 500 text
+  - Locked: switch on position, "Brackets are locked — no new picks allowed" in emphasized text
 - **Placement:** Top of admin page, clearly separated from matchup setup section below
-- **No confirmation dialog:** Toggle is easily reversible — no "are you sure?" needed
+- **No confirmation dialog:** Toggle is easily reversible — no "are you sure?" needed (per UX spec: low-stakes, easily reversible actions don't need confirmation)
 - **Immediate feedback:** Switch position updates optimistically, server saves in background
+- **Error display:** Inline error text below the switch if server action fails (per UX feedback patterns)
 
 ### Admin Page Layout After This Story
 
 ```
 ┌─────────────────────────────────┐
-│ Admin - Tournament Setup        │
+│ Tournament Setup                 │
 ├─────────────────────────────────┤
-│ Bracket Entry Control           │
-│ [Switch] Brackets are unlocked  │
+│ Bracket Entry Control            │
+│ [Switch] Brackets are unlocked   │
 ├─────────────────────────────────┤
-│ R32 Matchups (12 of 16)         │
-│ 1. Brazil vs Mexico     [Edit]  │
-│ 2. Argentina vs Australia [Edit] │
-│ 3. [Team A] vs [Team B] [Save]  │
-│ ...                              │
+│ R32 Matchups (12 of 16)          │
+│ 1. Brazil vs Mexico     [Edit]   │
+│ 2. Argentina vs Australia [Edit]  │
+│ 3. [Team A] vs [Team B] [Save]   │
+│ ...                               │
 └─────────────────────────────────┘
 ```
 
-### Previous Story Context
+### Previous Story Intelligence
 
-**Story 1.1-1.2:** Project scaffolding, users table, auth actions, landing page
-**Story 1.3:** enterApp action (with lock status TODO), route group, tab nav, admin placeholder
-**Story 2.1:** Matches table, admin Server Actions file (`admin.ts`) with `verifyAdmin()`, `setupMatchup()`, MatchupSetup component, admin page with matchup interface
+**From Story 2.1 (admin-page-matchup-setup) — completed:**
+- `src/lib/actions/admin.ts` already exists with `verifyAdmin()`, `setupMatchup()`, `getMatches()`, `deleteMatchup()`. Extend this file.
+- `verifyAdmin()` uses case-insensitive comparison: `username.toLowerCase() === process.env.ADMIN_USERNAME?.toLowerCase()`. Use the same function for lock toggle.
+- Admin page Server Component pattern: cookies check → redirect non-admin → fetch data → render components
+- `revalidatePath("/admin")` is called after mutations — do the same for toggleLock
+- Story 2.1 code review found that chained `.where()` doesn't work with Drizzle — must use `and()` for composite conditions
+- 36 total tests passing as of Story 2.1 completion
 
-**This story builds on:**
-- `src/db/schema.ts` — has `users` and `matches` tables, add `tournament_config` table
-- `src/lib/actions/admin.ts` — has `verifyAdmin()`, `setupMatchup()`, add `toggleLock()`, `getTournamentConfig()`, `checkBracketLock()`
-- `src/lib/actions/auth.ts` — update `enterApp()` to use real lock status
-- `src/app/(app)/admin/page.tsx` — add BracketLockToggle above existing MatchupSetup
-- `src/components/admin/` — has MatchupSetup, add BracketLockToggle
-- `src/types/index.ts` — has `User` and `Match`, add `TournamentConfig`
+**From Story 1.3 (returning-user-access):**
+- `enterApp()` in `src/lib/actions/auth.ts` has a placeholder for lock status
+- The function returns `{ isLocked: boolean }` as part of its response — update it to query real data
+- Route group `(app)` already exists with tab navigation including admin tab
 
-### Files Created/Modified in This Story
+### Git Intelligence
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `src/db/schema.ts` | Modified | Add `tournament_config` table definition |
-| `src/db/migrations/0002_*.sql` | Created | Third migration (tournament_config table) |
-| `src/lib/actions/admin.ts` | Modified | Add `toggleLock()`, `getTournamentConfig()`, `checkBracketLock()` |
-| `src/lib/actions/auth.ts` | Modified | Update `enterApp()` to query real lock status |
-| `src/app/(app)/admin/page.tsx` | Modified | Add BracketLockToggle section above matchup setup |
-| `src/components/admin/BracketLockToggle.tsx` | Created | Client component for lock toggle Switch |
-| `src/types/index.ts` | Modified | Add `TournamentConfig` type |
+Recent commit `b24dc60` (Story 2.1) touched:
+- `src/db/schema.ts` — added matches table (add tournament_config alongside)
+- `src/lib/actions/admin.ts` — created file (extend with new functions)
+- `src/app/(app)/admin/page.tsx` — replaced placeholder (extend with lock toggle)
+- `src/components/admin/MatchupSetup.tsx` — created (add sibling BracketLockToggle)
+- `src/types/index.ts` — added Match type (add TournamentConfig type)
 
-### Naming Conventions Reminder
+Code patterns established:
+- Drizzle schema uses `integer("column_name", { mode: "boolean" })` for boolean columns (see `users.bracketSubmitted`)
+- All admin Server Actions start with `if (!(await verifyAdmin()))` check
+- Components follow client component pattern: `"use client"` + `useState` + Server Action calls
+- Tests use the existing test infrastructure (Vitest based on Story 2.1 test file patterns)
 
-- Database table: `tournament_config` (snake_case, singular — this is a config table, not an entity collection)
-- Database columns: `is_locked`, `points_r32`, `points_qf` (snake_case)
-- TypeScript properties: `isLocked`, `pointsR32`, `pointsQf` (camelCase)
-- Server Action functions: `toggleLock()`, `getTournamentConfig()`, `checkBracketLock()` (camelCase verbs)
-- Component: `BracketLockToggle.tsx` (PascalCase)
-- Type: `TournamentConfig` (PascalCase)
+### Project Structure Notes
 
-### Testing Considerations
-
-Manual testing checklist:
-- [ ] Admin sees lock toggle on admin page
-- [ ] Toggle switch changes lock status in database
-- [ ] Switch reflects current lock state on page reload
-- [ ] Non-admin cannot call `toggleLock()` (returns unauthorized error)
-- [ ] After locking, `enterApp()` returns `isLocked: true` for all users
-- [ ] After unlocking, `enterApp()` returns `isLocked: false`
-- [ ] Lock toggle is independent of matchup setup — both work on same page
-- [ ] Default config row is auto-created on first access (unlocked, default point values)
+- All changes align with architecture-defined project structure
+- No new directories created — extends existing `src/components/admin/` and `src/lib/actions/`
+- `tournament_config` table completes the data model needed for bracket lock (FR29, FR30) and scoring configuration (FR24)
+- The `checkBracketLock()` export establishes the server-side enforcement boundary that Epic 3 will use
 
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 2.2: Bracket Lock Control]
-- [Source: _bmad-output/planning-artifacts/architecture.md#Data Architecture]
-- [Source: _bmad-output/planning-artifacts/architecture.md#Authentication & Security]
-- [Source: _bmad-output/planning-artifacts/architecture.md#Implementation Patterns & Consistency Rules]
-- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Component Strategy - BracketLockToggle]
-- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#User Journey Flows - Journey 3]
-- [Source: _bmad-output/planning-artifacts/prd.md#FR29, FR30]
-- [Source: _bmad-output/planning-artifacts/prd.md#NFR6 - Lock enforcement absolute]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Data Architecture — tournament_config table]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Authentication & Security — admin identification]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Implementation Patterns — Validation order, Server Action return shape]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Project Structure — admin components, actions]
+- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Component Strategy — BracketLockToggle, Switch]
+- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#User Journey Flows — Journey 3: Admin Result Entry]
+- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#UX Consistency Patterns — Feedback Patterns, Loading States]
+- [Source: _bmad-output/planning-artifacts/prd.md#FR29 — Admin toggles bracket lock]
+- [Source: _bmad-output/planning-artifacts/prd.md#FR30 — Lock prevents entry/modification]
+- [Source: _bmad-output/planning-artifacts/prd.md#NFR6 — Lock enforcement absolute, no race conditions]
+- [Source: _bmad-output/implementation-artifacts/2-1-admin-page-matchup-setup.md — Previous story patterns and learnings]
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- Migration `0002_sturdy_venus.sql` generated and applied successfully for tournament_config table
+- Mock DB setup required adding `.get` directly on `mockFrom` return to support `db.select().from(table).get()` pattern (no `.where()` call)
+- Auth test mocks updated to provide tournament_config query result as first `mockGet` call since lock status is now queried before user lookup
+
 ### Completion Notes List
 
+- Task 1: Added `tournamentConfig` table to Drizzle schema with 8 columns (id, is_locked, points_r32-final, created_at). Generated migration `0002_sturdy_venus.sql` and applied to Turso.
+- Task 2: Extended `src/lib/actions/admin.ts` with `getTournamentConfig()` (get-or-create), `toggleLock()` (admin-only), and `checkBracketLock()` (public). 7 new unit tests (24 total admin tests). getTournamentConfig does NOT require admin auth. toggleLock uses revalidatePath.
+- Task 3: Created `BracketLockToggle.tsx` client component with shadcn/ui Switch, optimistic UI, error rollback, loading state, and accessible aria-label. Visual states: locked (red text) vs unlocked (muted text).
+- Task 4: Updated admin page to fetch tournament config via `getTournamentConfig()` in parallel with `getMatches()`. BracketLockToggle rendered above MatchupSetup with spacing separator.
+- Task 5: Updated `enterApp()` in auth.ts — replaced TODO placeholder with real `tournament_config` DB query. Lock status queried once before try block, used in both happy path and race condition catch block. Defaults to `false` if no config row exists.
+- Task 6: Added `TournamentConfig` type to `src/types/index.ts` with all 8 fields.
+
+### Change Log
+
+- 2026-02-18: Implemented Story 2.2 — all 6 tasks complete, 8 new tests, 44 total tests passing
+- 2026-02-18: Code review fixes — 3 issues fixed (1 HIGH, 2 MEDIUM): H1 getTournamentConfig race condition on concurrent auto-create (re-query after insert for canonical row), M1 boolean type validation on toggleLock, M2 documented as resolved by H1 defensive pattern. 1 new test added (25 admin tests, 45 total passing).
+
 ### File List
+
+- `worldcup-app/src/db/schema.ts` (modified) — added `tournamentConfig` table definition
+- `worldcup-app/src/db/migrations/0002_sturdy_venus.sql` (created) — tournament_config table migration
+- `worldcup-app/src/db/migrations/meta/0002_snapshot.json` (created) — migration snapshot
+- `worldcup-app/src/db/migrations/meta/_journal.json` (modified) — migration journal updated
+- `worldcup-app/src/lib/actions/admin.ts` (modified) — added `getTournamentConfig()`, `toggleLock()`, `checkBracketLock()`
+- `worldcup-app/src/lib/actions/admin.test.ts` (modified) — 7 new unit tests for tournament config and lock functions
+- `worldcup-app/src/lib/actions/auth.ts` (modified) — replaced lock status placeholder with real DB query
+- `worldcup-app/src/lib/actions/auth.test.ts` (modified) — updated mocks for tournament_config query, added isLocked=true test
+- `worldcup-app/src/components/admin/BracketLockToggle.tsx` (created) — client component for bracket lock Switch toggle
+- `worldcup-app/src/app/(app)/admin/page.tsx` (modified) — integrated BracketLockToggle above MatchupSetup
+- `worldcup-app/src/types/index.ts` (modified) — added `TournamentConfig` type

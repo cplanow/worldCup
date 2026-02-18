@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -11,6 +11,17 @@ export const users = sqliteTable("users", {
     .default(false),
 });
 
+export const tournamentConfig = sqliteTable("tournament_config", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  isLocked: integer("is_locked", { mode: "boolean" }).notNull().default(false),
+  pointsR32: integer("points_r32").notNull().default(1),
+  pointsR16: integer("points_r16").notNull().default(2),
+  pointsQf: integer("points_qf").notNull().default(4),
+  pointsSf: integer("points_sf").notNull().default(8),
+  pointsFinal: integer("points_final").notNull().default(16),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 export const matches = sqliteTable("matches", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamA: text("team_a").notNull(),
@@ -21,4 +32,15 @@ export const matches = sqliteTable("matches", {
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [
   index("idx_matches_round_position").on(table.round, table.position),
+]);
+
+export const picks = sqliteTable("picks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  matchId: integer("match_id").notNull().references(() => matches.id),
+  selectedTeam: text("selected_team").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("idx_picks_user_id").on(table.userId),
+  uniqueIndex("idx_picks_user_match").on(table.userId, table.matchId),
 ]);

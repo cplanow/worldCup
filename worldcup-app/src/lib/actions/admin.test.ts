@@ -20,11 +20,12 @@ vi.mock("@/db", () => {
   const mockValues = vi.fn(() => ({ returning: mockReturning }));
   const mockSet = vi.fn(() => ({ where: vi.fn() }));
   const mockDeleteWhere = vi.fn();
-  const mockSelectWhere = vi.fn(() => ({ get: mockGet }));
+  const mockSelectWhere = vi.fn(() => ({ get: mockGet, all: mockAll }));
   const mockSelectOrderBy = vi.fn(() => ({ all: mockAll }));
   const mockSelectFrom = vi.fn(() => ({
     where: mockSelectWhere,
     orderBy: mockSelectOrderBy,
+    get: mockGet,
   }));
 
   return {
@@ -57,6 +58,16 @@ vi.mock("@/db/schema", () => ({
     winner: "winner",
     createdAt: "created_at",
   },
+  tournamentConfig: {
+    id: "id",
+    isLocked: "is_locked",
+    pointsR32: "points_r32",
+    pointsR16: "points_r16",
+    pointsQf: "points_qf",
+    pointsSf: "points_sf",
+    pointsFinal: "points_final",
+    createdAt: "created_at",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -65,7 +76,7 @@ vi.mock("drizzle-orm", () => ({
   asc: vi.fn((col) => ({ type: "asc", col })),
 }));
 
-import { setupMatchup, getMatches, deleteMatchup } from "./admin";
+import { setupMatchup, getMatches, deleteMatchup, getTournamentConfig, toggleLock, checkBracketLock, initializeBracketStructure } from "./admin";
 import { cookies } from "next/headers";
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -245,5 +256,155 @@ describe("deleteMatchup", () => {
     mockAdmin();
     const result = await deleteMatchup(5);
     expect(result).toEqual({ success: true, data: null });
+  });
+});
+
+const mockConfigRow = {
+  id: 1,
+  isLocked: false,
+  pointsR32: 1,
+  pointsR16: 2,
+  pointsQf: 4,
+  pointsSf: 8,
+  pointsFinal: 16,
+  createdAt: "2026-02-18T00:00:00.000Z",
+};
+
+describe("getTournamentConfig", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("returns existing config when row exists", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockConfigRow);
+
+    const result = await getTournamentConfig();
+    expect(result).toEqual(mockConfigRow);
+  });
+
+  it("creates default config row when none exists and re-queries canonical row", async () => {
+    const { mockGet, mockReturning } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // first query: no row
+    mockReturning.mockResolvedValueOnce([mockConfigRow]); // insert
+    mockGet.mockResolvedValueOnce(mockConfigRow); // re-query after insert
+
+    const result = await getTournamentConfig();
+    expect(result).toEqual(mockConfigRow);
+  });
+});
+
+describe("toggleLock", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin users", async () => {
+    mockNonAdmin();
+    const result = await toggleLock(true);
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("rejects non-boolean lock value", async () => {
+    mockAdmin();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await toggleLock("yes" as any);
+    expect(result).toEqual({ success: false, error: "Invalid lock value" });
+  });
+
+  it("locks brackets when admin toggles to locked", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockConfigRow);
+
+    const result = await toggleLock(true);
+    expect(result).toEqual({ success: true, data: { isLocked: true } });
+    expect(mockSet).toHaveBeenCalledWith({ isLocked: true });
+  });
+
+  it("unlocks brackets when admin toggles to unlocked", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ ...mockConfigRow, isLocked: true });
+
+    const result = await toggleLock(false);
+    expect(result).toEqual({ success: true, data: { isLocked: false } });
+    expect(mockSet).toHaveBeenCalledWith({ isLocked: false });
+  });
+});
+
+describe("checkBracketLock", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("returns false when brackets are unlocked", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockConfigRow);
+
+    const result = await checkBracketLock();
+    expect(result).toBe(false);
+  });
+
+  it("returns true when brackets are locked", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ ...mockConfigRow, isLocked: true });
+
+    const result = await checkBracketLock();
+    expect(result).toBe(true);
+  });
+});
+
+describe("initializeBracketStructure", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin users", async () => {
+    mockNonAdmin();
+    const result = await initializeBracketStructure();
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("rejects when fewer than 16 R32 matches exist", async () => {
+    mockAdmin();
+    const { mockAll } = await getDbMocks();
+    mockAll.mockResolvedValueOnce(Array(10).fill({ id: 1, round: 1 }));
+
+    const result = await initializeBracketStructure();
+    expect(result).toEqual({
+      success: false,
+      error: "Need all 16 R32 matches before initializing bracket structure (found 10)",
+    });
+  });
+
+  it("returns created: 0 when later-round matches already exist", async () => {
+    mockAdmin();
+    const { mockAll } = await getDbMocks();
+    mockAll.mockResolvedValueOnce(Array(16).fill({ id: 1, round: 1 })); // R32 matches
+    mockAll.mockResolvedValueOnce([{ id: 17, round: 2 }]); // existing round 2
+
+    const result = await initializeBracketStructure();
+    expect(result).toEqual({ success: true, data: { created: 0 } });
+  });
+
+  it("creates 15 placeholder matches for rounds 2-5", async () => {
+    mockAdmin();
+    const { mockAll, mockValues } = await getDbMocks();
+    mockAll.mockResolvedValueOnce(Array(16).fill({ id: 1, round: 1 })); // R32 matches
+    mockAll.mockResolvedValueOnce([]); // no existing later rounds
+
+    const result = await initializeBracketStructure();
+    expect(result).toEqual({ success: true, data: { created: 15 } });
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ round: 2, position: 1, teamA: "", teamB: "" }),
+        expect.objectContaining({ round: 5, position: 1, teamA: "", teamB: "" }),
+      ])
+    );
   });
 });
