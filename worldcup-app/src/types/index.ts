@@ -1,1 +1,6 @@
-// Types - added as needed in later stories
+export type User = {
+  id: number;
+  username: string;
+  createdAt: string;
+  bracketSubmitted: boolean;
+};

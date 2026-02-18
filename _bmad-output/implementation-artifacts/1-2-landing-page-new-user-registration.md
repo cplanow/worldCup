@@ -1,6 +1,6 @@
 # Story 1.2: Landing Page & New User Registration
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,37 +39,37 @@ so that I can create my identity and join the bracket pool.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define users table schema (AC: #5)
-  - [ ] Add `users` table definition to `src/db/schema.ts` using Drizzle's SQLite table builder
-  - [ ] Columns: `id` (integer, primary key, autoincrement), `username` (text, not null, unique), `created_at` (text, not null, default to ISO 8601 timestamp), `bracket_submitted` (integer, not null, default 0 — SQLite boolean)
-  - [ ] Add index: `idx_users_username` on `username` column for fast lookups
-  - [ ] Run `npx drizzle-kit generate` to create migration SQL file in `src/db/migrations/`
-  - [ ] Run `npx drizzle-kit migrate` to apply migration to Turso database
-  - [ ] Verify table exists in Turso
+- [x] Task 1: Define users table schema (AC: #5)
+  - [x] Add `users` table definition to `src/db/schema.ts` using Drizzle's SQLite table builder
+  - [x] Columns: `id` (integer, primary key, autoincrement), `username` (text, not null, unique), `created_at` (text, not null, default to ISO 8601 timestamp), `bracket_submitted` (integer, not null, default 0 — SQLite boolean)
+  - [x] Add index: `idx_users_username` on `username` column for fast lookups
+  - [x] Run `npx drizzle-kit generate` to create migration SQL file in `src/db/migrations/`
+  - [x] Run `npx drizzle-kit migrate` to apply migration to Turso database
+  - [x] Verify table exists in Turso
 
-- [ ] Task 2: Create auth Server Actions (AC: #2, #3)
-  - [ ] Create `src/lib/actions/auth.ts` with `"use server"` directive
-  - [ ] Implement `createUser(username: string): Promise<ActionResult<{ userId: number }>>`:
+- [x] Task 2: Create auth Server Actions (AC: #2, #3)
+  - [x] Create `src/lib/actions/auth.ts` with `"use server"` directive
+  - [x] Implement `createUser(username: string): Promise<ActionResult<{ userId: number }>>`:
     - Validate username is non-empty and trimmed
     - Check if username already exists in `users` table
     - If exists: return `{ success: false, error: "That name is already taken" }`
     - If not exists: insert new user, return `{ success: true, data: { userId } }`
-  - [ ] Import `ActionResult` from `@/lib/actions/types`
-  - [ ] Import `db` from `@/db`
-  - [ ] Import `users` table from `@/db/schema`
+  - [x] Import `ActionResult` from `@/lib/actions/types`
+  - [x] Import `db` from `@/db`
+  - [x] Import `users` table from `@/db/schema`
 
-- [ ] Task 3: Build landing page UI (AC: #1, #4)
-  - [ ] Replace `src/app/page.tsx` default content with landing page component
-  - [ ] Landing page is a Server Component that renders a client component for the form
-  - [ ] Create `src/app/page.tsx` as the Server Component wrapper (centered layout, minimal)
-  - [ ] Create a client component for the username form (needs `"use client"` for form interaction):
+- [x] Task 3: Build landing page UI (AC: #1, #4)
+  - [x] Replace `src/app/page.tsx` default content with landing page component
+  - [x] Landing page is a Server Component that renders a client component for the form
+  - [x] Create `src/app/page.tsx` as the Server Component wrapper (centered layout, minimal)
+  - [x] Create a client component for the username form (needs `"use client"` for form interaction):
     - Use shadcn/ui `Input` component for username field
     - Use shadcn/ui `Button` component for "Enter" button
     - Center the form vertically and horizontally on the page
     - Client-side validation: prevent empty username submission (HTML `required` attribute + form validation)
     - Display inline error message below input when Server Action returns an error
     - Show "Submitting..." on button during Server Action execution (disabled state)
-  - [ ] Style per UX spec:
+  - [x] Style per UX spec:
     - White background, centered content
     - App title/logo area above input (simple text: "worldCup" or similar)
     - Input: 16px font, generous padding, centered text
@@ -77,14 +77,14 @@ so that I can create my identity and join the bracket pool.
     - Error text: red, 14px, below input field
     - Max-width container for comfortable reading width
 
-- [ ] Task 4: Implement form submission and routing (AC: #2, #3)
-  - [ ] On form submit, call `createUser()` Server Action with trimmed username
-  - [ ] On success: use `router.push()` to route user into the app (route to `/bracket` for now — state-based routing comes in Story 1.3)
-  - [ ] On error: display error message inline below input, keep form interactive
-  - [ ] Store username in a cookie or URL param for session identification (no auth library — simple username-based identity)
+- [x] Task 4: Implement form submission and routing (AC: #2, #3)
+  - [x] On form submit, call `createUser()` Server Action with trimmed username
+  - [x] On success: use `router.push()` to route user into the app (route to `/bracket` for now — state-based routing comes in Story 1.3)
+  - [x] On error: display error message inline below input, keep form interactive
+  - [x] Store username in a cookie or URL param for session identification (no auth library — simple username-based identity)
 
-- [ ] Task 5: Add User type to shared types (AC: #5)
-  - [ ] Add `User` type to `src/types/index.ts`:
+- [x] Task 5: Add User type to shared types (AC: #5)
+  - [x] Add `User` type to `src/types/index.ts`:
     ```typescript
     export type User = {
       id: number;
@@ -268,10 +268,39 @@ Story 1.1 established:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- jsdom v28 has ESM compatibility issues with Node 21.5.0 — switched to happy-dom for test environment
+- drizzle-kit migrate requires explicit env var export (does not read .env.local automatically)
+- vi.mock hoisting in vitest v4 requires factory functions to avoid referencing variables declared outside the factory
+
 ### Completion Notes List
 
+- Task 1: Defined `users` table in schema.ts with id, username, created_at, bracket_submitted columns. Added idx_users_username index. Generated migration 0000_flat_kronos.sql and applied to Turso. Verified table structure in Turso shell.
+- Task 2: Created auth.ts server action with createUser() function. Validates empty input, checks username uniqueness, inserts user, sets httpOnly cookie for session identification. Uses ActionResult<T> return type.
+- Task 3: Replaced default Next.js landing page with minimal UI — "worldCup" title, centered username input (shadcn Input), and "Enter" button (shadcn Button, Slate 900). Created UsernameForm client component with inline error display and disabled/submitting state.
+- Task 4: Form submission calls createUser server action, routes to /bracket on success via router.push(), displays inline error on failure. Cookie-based session identification set in server action. Created /bracket placeholder page.
+- Task 5: Added User type to src/types/index.ts with id, username, createdAt, bracketSubmitted properties.
+- Testing: Set up Vitest + happy-dom + React Testing Library. 9 tests across 2 test files — 5 unit tests for createUser logic (empty, whitespace, collision, success+cookie, trimming), 4 component tests for UsernameForm (render, error display, redirect, submitting state).
+
+### Change Log
+
+- 2026-02-17: Story 1.2 implementation — landing page, user registration, database schema, server actions, tests.
+
 ### File List
+
+- worldcup-app/src/db/schema.ts (modified — added users table)
+- worldcup-app/src/db/migrations/0000_flat_kronos.sql (new — generated migration)
+- worldcup-app/src/db/migrations/meta/0000_snapshot.json (new — drizzle metadata)
+- worldcup-app/src/db/migrations/meta/_journal.json (new — drizzle metadata)
+- worldcup-app/src/lib/actions/auth.ts (new — createUser server action)
+- worldcup-app/src/app/page.tsx (replaced — landing page with username form)
+- worldcup-app/src/app/bracket/page.tsx (new — placeholder bracket page)
+- worldcup-app/src/components/UsernameForm.tsx (new — client component for username form)
+- worldcup-app/src/types/index.ts (modified — added User type)
+- worldcup-app/src/__tests__/auth.test.ts (new — createUser unit tests)
+- worldcup-app/src/__tests__/UsernameForm.test.tsx (new — component tests)
+- worldcup-app/vitest.config.mts (new — vitest configuration)
+- worldcup-app/package.json (modified — added test deps and scripts)
