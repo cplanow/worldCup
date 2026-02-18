@@ -1,6 +1,6 @@
 # Story 1.3: Returning User Access & State-Based Routing
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,62 +39,62 @@ so that I can check my picks and standings without creating a new account.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create loginUser Server Action (AC: #1)
-  - [ ] Add `loginUser(username: string): Promise<ActionResult<{ user: User; isAdmin: boolean }>>` to `src/lib/actions/auth.ts`
-  - [ ] Validate username is non-empty and trimmed
-  - [ ] Look up username in `users` table
-  - [ ] If not found: return `{ success: false, error: "Username not found" }`
-  - [ ] If found: set session cookie (same pattern as `createUser`), return user data with `isAdmin` flag
-  - [ ] Determine `isAdmin` by comparing username to `process.env.ADMIN_USERNAME`
+- [x] Task 1: Create loginUser Server Action (AC: #1)
+  - [x] Add `loginUser(username: string): Promise<ActionResult<{ user: User; isAdmin: boolean }>>` to `src/lib/actions/auth.ts`
+  - [x] Validate username is non-empty and trimmed
+  - [x] Look up username in `users` table
+  - [x] If not found: return `{ success: false, error: "Username not found" }`
+  - [x] If found: set session cookie (same pattern as `createUser`), return user data with `isAdmin` flag
+  - [x] Determine `isAdmin` by comparing username to `process.env.ADMIN_USERNAME`
 
-- [ ] Task 2: Update landing page to handle both new and returning users (AC: #1, #2, #3, #4)
-  - [ ] Modify `src/app/page.tsx` landing page form to try login first, then create:
+- [x] Task 2: Update landing page to handle both new and returning users (AC: #1, #2, #3, #4)
+  - [x] Modify `src/app/page.tsx` landing page form to try login first, then create:
     - On submit: call `loginUser()` first
     - If user found → route based on state (see routing logic below)
     - If user not found → call `createUser()` to register → route to `/bracket`
-  - [ ] Alternative simpler approach: single `enterApp(username)` Server Action that handles both cases:
+  - [x] Alternative simpler approach: single `enterApp(username)` Server Action that handles both cases:
     - Look up user → if exists, return existing user data
     - If not exists → create new user, return new user data
     - Always set session cookie
     - Return user state for client-side routing
-  - [ ] Remove the "That name is already taken" error from Story 1.2 — usernames are now shared identity, not collision errors
-  - [ ] Update error handling: only show errors for empty username or server failures
+  - [x] Remove the "That name is already taken" error from Story 1.2 — usernames are now shared identity, not collision errors
+  - [x] Update error handling: only show errors for empty username or server failures
 
-- [ ] Task 3: Implement state-based routing logic (AC: #2, #3, #4)
-  - [ ] After successful login/registration, route user based on state:
+- [x] Task 3: Implement state-based routing logic (AC: #2, #3, #4)
+  - [x] After successful login/registration, route user based on state:
     - `bracketSubmitted === true` → redirect to `/leaderboard`
     - `bracketSubmitted === false` AND brackets unlocked → redirect to `/bracket`
     - `bracketSubmitted === false` AND brackets locked → redirect to `/leaderboard` (with locked message)
-  - [ ] To check bracket lock status, query `tournament_config` table for `is_locked` value
-  - [ ] Note: `tournament_config` table doesn't exist yet (created in Story 2.2). For now, default to unlocked (`is_locked = false`) if table/row doesn't exist. Handle gracefully with a try/catch or conditional check.
-  - [ ] Routing happens client-side via `router.push()` after Server Action returns state data
+  - [x] To check bracket lock status, query `tournament_config` table for `is_locked` value
+  - [x] Note: `tournament_config` table doesn't exist yet (created in Story 2.2). For now, default to unlocked (`is_locked = false`) if table/row doesn't exist. Handle gracefully with a try/catch or conditional check.
+  - [x] Routing happens client-side via `router.push()` after Server Action returns state data
 
-- [ ] Task 4: Create app layout with tab navigation (AC: #5)
-  - [ ] Create `src/app/(app)/layout.tsx` — a route group layout for authenticated views (bracket, leaderboard, admin)
-  - [ ] The `(app)` route group wraps `/bracket`, `/leaderboard`, and `/admin` pages with shared tab navigation
-  - [ ] Move existing pages into route group:
+- [x] Task 4: Create app layout with tab navigation (AC: #5)
+  - [x] Create `src/app/(app)/layout.tsx` — a route group layout for authenticated views (bracket, leaderboard, admin)
+  - [x] The `(app)` route group wraps `/bracket`, `/leaderboard`, and `/admin` pages with shared tab navigation
+  - [x] Move existing pages into route group:
     - `src/app/(app)/bracket/page.tsx`
     - `src/app/(app)/leaderboard/page.tsx`
     - `src/app/(app)/admin/page.tsx`
-  - [ ] Build tab navigation component using shadcn/ui `Tabs`:
+  - [x] Build tab navigation component using shadcn/ui `Tabs`:
     - Tab order: Leaderboard | My Bracket | Admin (admin only)
     - Active tab: underline indicator (2px Slate 900 bottom border), bold text
     - Inactive tabs: Slate 500 text, no underline
     - Tabs always visible below app header
     - Tab switches view via Next.js navigation (not client-side tab state)
-  - [ ] Read session cookie in layout to determine current user
-  - [ ] Compare username to `ADMIN_USERNAME` env var to conditionally render Admin tab
-  - [ ] Create navigation component: `src/components/navigation/TabNav.tsx` (client component for active state)
+  - [x] Read session cookie in layout to determine current user
+  - [x] Compare username to `ADMIN_USERNAME` env var to conditionally render Admin tab
+  - [x] Create navigation component: `src/components/navigation/TabNav.tsx` (client component for active state)
 
-- [ ] Task 5: Create placeholder pages (AC: #2, #3, #4)
-  - [ ] Create `src/app/(app)/leaderboard/page.tsx` — placeholder with "Leaderboard coming soon" message
-  - [ ] Update `src/app/(app)/bracket/page.tsx` — placeholder with "Bracket view coming soon" message (move from Story 1.2 location)
-  - [ ] Create `src/app/(app)/admin/page.tsx` — placeholder with "Admin tools coming soon" message, server-side admin check (redirect non-admin to leaderboard)
+- [x] Task 5: Create placeholder pages (AC: #2, #3, #4)
+  - [x] Create `src/app/(app)/leaderboard/page.tsx` — placeholder with "Leaderboard coming soon" message
+  - [x] Update `src/app/(app)/bracket/page.tsx` — placeholder with "Bracket view coming soon" message (move from Story 1.2 location)
+  - [x] Create `src/app/(app)/admin/page.tsx` — placeholder with "Admin tools coming soon" message, server-side admin check (redirect non-admin to leaderboard)
 
-- [ ] Task 6: Handle session persistence and logout (AC: #1)
-  - [ ] If a user navigates to the root `/` while already having a session cookie, redirect them to the appropriate view (skip landing page)
-  - [ ] Check session cookie in `src/app/page.tsx` Server Component — if cookie exists and user is valid, redirect based on state
-  - [ ] No explicit logout flow needed (trust-based, 12 users) — user can clear cookies manually or enter a different username
+- [x] Task 6: Handle session persistence and logout (AC: #1)
+  - [x] If a user navigates to the root `/` while already having a session cookie, redirect them to the appropriate view (skip landing page)
+  - [x] Check session cookie in `src/app/page.tsx` Server Component — if cookie exists and user is valid, redirect based on state
+  - [x] No explicit logout flow needed (trust-based, 12 users) — user can clear cookies manually or enter a different username
 
 ## Dev Notes
 
@@ -380,10 +380,52 @@ Manual testing checklist for this story:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Replaced `createUser()` with unified `enterApp()` Server Action that handles both new and returning users in a single flow
+- Implemented state-based routing: submitted users → leaderboard, unsubmitted + unlocked → bracket, unsubmitted + locked → leaderboard
+- Created `(app)` route group with shared layout containing header and tab navigation
+- TabNav uses Next.js Link-based navigation (not shadcn Tabs panel switching) — active tab determined by pathname
+- Admin tab conditionally rendered based on session cookie vs `ADMIN_USERNAME` env var
+- Admin page has server-side protection — non-admin users redirected to leaderboard
+- Landing page auto-redirects users with valid session cookies (skip re-authentication)
+- `tournament_config` lock check defaults to unlocked (table created in Story 2.2)
+- Race condition handled: UNIQUE constraint failure on insert retries as login
+- Old route directories (`src/app/bracket/`, `src/app/leaderboard/`, `src/app/admin/`) removed — pages moved into `(app)` route group
+- Build passes successfully with all routes registered
+
+## Senior Developer Review (AI)
+
+**Review Date:** 2026-02-17
+**Review Outcome:** Changes Requested (6 issues found, all fixed)
+
+### Action Items
+
+- [x] [HIGH] AC4 locked message not implemented — added `?locked=1` query param and `LockMessage` component on leaderboard page
+- [x] [HIGH] Auto-redirect in page.tsx skipped lock status check — added lock check (defaults to false, TODO for Story 2.2)
+- [x] [MEDIUM] No automated tests — updated existing tests and added 19 tests covering enterApp, routing, admin, edge cases
+- [x] [MEDIUM] Duplicate cookie-setting code — extracted `setSessionCookie()` helper
+- [x] [MEDIUM] Stale cookie not cleared — added `cookieStore.delete("username")` when user not found in DB
+- [x] [MEDIUM] Admin username comparison fragility — added `.toLowerCase()` to ADMIN_USERNAME comparisons in layout and admin page, extracted `checkIsAdmin()` helper
+
 ### File List
+
+- `src/lib/actions/auth.ts` — Modified: replaced `createUser()` with `enterApp()`, extracted `setSessionCookie()` and `checkIsAdmin()` helpers
+- `src/lib/actions/auth.test.ts` — Modified: updated tests from `createUser` to `enterApp` with 13 test cases
+- `src/components/UsernameForm.tsx` — Modified: uses `enterApp()`, implements state-based client routing with `?locked=1` param
+- `src/components/UsernameForm.test.tsx` — Modified: updated tests for `enterApp`, added routing tests for submitted/locked states (6 tests)
+- `src/components/LockMessage.tsx` — Created: alert component for bracket lock notification
+- `src/app/page.tsx` — Modified: added auto-redirect with lock check, stale cookie cleanup
+- `src/app/(app)/layout.tsx` — Created: shared layout with header, session check, tab navigation, case-insensitive admin check
+- `src/app/(app)/bracket/page.tsx` — Created: placeholder bracket page (moved from old location)
+- `src/app/(app)/leaderboard/page.tsx` — Created: placeholder leaderboard page with lock message support via searchParams
+- `src/app/(app)/admin/page.tsx` — Created: placeholder admin page with case-insensitive admin protection
+- `src/components/navigation/TabNav.tsx` — Created: client component for tab navigation with active state
+- `src/app/bracket/page.tsx` — Deleted: moved into (app) route group
+- `src/app/bracket/.gitkeep` — Deleted
+- `src/app/leaderboard/.gitkeep` — Deleted
+- `src/app/admin/.gitkeep` — Deleted

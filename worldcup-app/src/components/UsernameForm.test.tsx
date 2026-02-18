@@ -9,9 +9,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock the server action
-const mockCreateUser = vi.fn();
+const mockEnterApp = vi.fn();
 vi.mock("@/lib/actions/auth", () => ({
-  createUser: (...args: unknown[]) => mockCreateUser(...args),
+  enterApp: (...args: unknown[]) => mockEnterApp(...args),
 }));
 
 describe("UsernameForm", () => {
@@ -25,10 +25,10 @@ describe("UsernameForm", () => {
     expect(screen.getByRole("button", { name: "Enter" })).toBeDefined();
   });
 
-  it("shows error message when createUser fails", async () => {
-    mockCreateUser.mockResolvedValueOnce({
+  it("shows error message when enterApp fails", async () => {
+    mockEnterApp.mockResolvedValueOnce({
       success: false,
-      error: "That name is already taken",
+      error: "Something went wrong. Please try again.",
     });
 
     render(<UsernameForm />);
@@ -38,14 +38,23 @@ describe("UsernameForm", () => {
     fireEvent.submit(screen.getByRole("button", { name: "Enter" }));
 
     await waitFor(() => {
-      expect(screen.getByText("That name is already taken")).toBeDefined();
+      expect(
+        screen.getByText("Something went wrong. Please try again.")
+      ).toBeDefined();
     });
   });
 
-  it("redirects to /bracket on success", async () => {
-    mockCreateUser.mockResolvedValueOnce({
+  it("redirects to /bracket for new user (unlocked)", async () => {
+    mockEnterApp.mockResolvedValueOnce({
       success: true,
-      data: { userId: 1 },
+      data: {
+        userId: 1,
+        username: "newuser",
+        bracketSubmitted: false,
+        isAdmin: false,
+        isLocked: false,
+        isNewUser: true,
+      },
     });
 
     render(<UsernameForm />);
@@ -59,11 +68,59 @@ describe("UsernameForm", () => {
     });
   });
 
+  it("redirects to /leaderboard for submitted bracket", async () => {
+    mockEnterApp.mockResolvedValueOnce({
+      success: true,
+      data: {
+        userId: 2,
+        username: "returning",
+        bracketSubmitted: true,
+        isAdmin: false,
+        isLocked: false,
+        isNewUser: false,
+      },
+    });
+
+    render(<UsernameForm />);
+
+    const input = screen.getByPlaceholderText("Enter your name");
+    fireEvent.change(input, { target: { value: "returning" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Enter" }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/leaderboard");
+    });
+  });
+
+  it("redirects to /leaderboard?locked=1 when brackets are locked", async () => {
+    mockEnterApp.mockResolvedValueOnce({
+      success: true,
+      data: {
+        userId: 3,
+        username: "lockeduser",
+        bracketSubmitted: false,
+        isAdmin: false,
+        isLocked: true,
+        isNewUser: false,
+      },
+    });
+
+    render(<UsernameForm />);
+
+    const input = screen.getByPlaceholderText("Enter your name");
+    fireEvent.change(input, { target: { value: "lockeduser" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Enter" }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/leaderboard?locked=1");
+    });
+  });
+
   it("disables button and shows Submitting... during submission", async () => {
-    let resolveCreateUser: (value: unknown) => void;
-    mockCreateUser.mockReturnValueOnce(
+    let resolveEnterApp: (value: unknown) => void;
+    mockEnterApp.mockReturnValueOnce(
       new Promise((resolve) => {
-        resolveCreateUser = resolve;
+        resolveEnterApp = resolve;
       })
     );
 
@@ -79,6 +136,16 @@ describe("UsernameForm", () => {
       expect((button as HTMLButtonElement).disabled).toBe(true);
     });
 
-    resolveCreateUser!({ success: true, data: { userId: 1 } });
+    resolveEnterApp!({
+      success: true,
+      data: {
+        userId: 1,
+        username: "test",
+        bracketSubmitted: false,
+        isAdmin: false,
+        isLocked: false,
+        isNewUser: true,
+      },
+    });
   });
 });

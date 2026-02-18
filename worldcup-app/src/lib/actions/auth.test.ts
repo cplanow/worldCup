@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("next/headers", () => ({
   cookies: vi.fn().mockResolvedValue({
     set: vi.fn(),
+    delete: vi.fn(),
   }),
 }));
 
@@ -32,22 +33,29 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col, val) => ({ col, val })),
 }));
 
-import { createUser } from "@/lib/actions/auth";
+import { enterApp } from "@/lib/actions/auth";
 import { cookies } from "next/headers";
 
 // Access the mock internals
 const getDbMocks = async () => {
-  const mod = await import("@/db") as { __mocks: { mockGet: ReturnType<typeof vi.fn>; mockReturning: ReturnType<typeof vi.fn>; mockValues: ReturnType<typeof vi.fn> } };
+  const mod = (await import("@/db")) as {
+    __mocks: {
+      mockGet: ReturnType<typeof vi.fn>;
+      mockReturning: ReturnType<typeof vi.fn>;
+      mockValues: ReturnType<typeof vi.fn>;
+    };
+  };
   return mod.__mocks;
 };
 
-describe("createUser", () => {
+describe("enterApp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
   });
 
   it("returns error for empty username", async () => {
-    const result = await createUser("");
+    const result = await enterApp("");
     expect(result).toEqual({
       success: false,
       error: "Username is required",
@@ -55,38 +63,72 @@ describe("createUser", () => {
   });
 
   it("returns error for whitespace-only username", async () => {
-    const result = await createUser("   ");
+    const result = await enterApp("   ");
     expect(result).toEqual({
       success: false,
       error: "Username is required",
     });
   });
 
-  it("returns error when username already exists", async () => {
-    const { mockGet } = await getDbMocks();
-    mockGet.mockResolvedValueOnce({ id: 1, username: "chris" });
-
-    const result = await createUser("Chris");
+  it("returns error when username exceeds max length", async () => {
+    const longName = "a".repeat(31);
+    const result = await enterApp(longName);
     expect(result).toEqual({
       success: false,
-      error: "That name is already taken",
+      error: "Username must be 30 characters or less",
     });
   });
 
-  it("creates user and sets cookie when username is available", async () => {
+  it("creates new user when username not found", async () => {
     const { mockGet, mockReturning } = await getDbMocks();
     mockGet.mockResolvedValueOnce(undefined);
     mockReturning.mockResolvedValueOnce([{ id: 42 }]);
 
-    const result = await createUser("NewUser");
+    const result = await enterApp("NewUser");
 
-    expect(result).toEqual({
-      success: true,
-      data: { userId: 42 },
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isNewUser).toBe(true);
+      expect(result.data.username).toBe("newuser");
+      expect(result.data.userId).toBe(42);
+      expect(result.data.bracketSubmitted).toBe(false);
+      expect(result.data.isLocked).toBe(false);
+    }
+  });
+
+  it("returns existing user when username found", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({
+      id: 5,
+      username: "chris",
+      bracketSubmitted: true,
+      createdAt: "2026-01-01",
     });
 
+    const result = await enterApp("Chris");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isNewUser).toBe(false);
+      expect(result.data.userId).toBe(5);
+      expect(result.data.bracketSubmitted).toBe(true);
+      expect(result.data.username).toBe("chris");
+    }
+  });
+
+  it("sets session cookie on successful login", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({
+      id: 1,
+      username: "user1",
+      bracketSubmitted: false,
+      createdAt: "2026-01-01",
+    });
+
+    await enterApp("user1");
+
     const cookieStore = await (cookies as ReturnType<typeof vi.fn>)();
-    expect(cookieStore.set).toHaveBeenCalledWith("username", "newuser", {
+    expect(cookieStore.set).toHaveBeenCalledWith("username", "user1", {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
@@ -94,57 +136,125 @@ describe("createUser", () => {
     });
   });
 
-  it("trims and lowercases username before processing", async () => {
+  it("sets session cookie on new user creation", async () => {
     const { mockGet, mockReturning } = await getDbMocks();
     mockGet.mockResolvedValueOnce(undefined);
-    mockReturning.mockResolvedValueOnce([{ id: 5 }]);
+    mockReturning.mockResolvedValueOnce([{ id: 1 }]);
 
-    const result = await createUser("  Trimmed  ");
-
-    expect(result).toEqual({
-      success: true,
-      data: { userId: 5 },
-    });
+    await enterApp("brand_new");
 
     const cookieStore = await (cookies as ReturnType<typeof vi.fn>)();
     expect(cookieStore.set).toHaveBeenCalledWith(
       "username",
-      "trimmed",
-      expect.any(Object)
+      "brand_new",
+      expect.objectContaining({ httpOnly: true })
     );
   });
 
-  it("returns error when username exceeds max length", async () => {
-    const longName = "a".repeat(31);
-    const result = await createUser(longName);
-    expect(result).toEqual({
-      success: false,
-      error: "Username must be 30 characters or less",
+  it("trims and lowercases username", async () => {
+    const { mockGet, mockReturning } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined);
+    mockReturning.mockResolvedValueOnce([{ id: 3 }]);
+
+    const result = await enterApp("  TestUser  ");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.username).toBe("testuser");
+    }
+  });
+
+  it("identifies admin user correctly (case-insensitive)", async () => {
+    process.env.ADMIN_USERNAME = "Admin";
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({
+      id: 1,
+      username: "admin",
+      bracketSubmitted: false,
+      createdAt: "2026-01-01",
     });
+
+    const result = await enterApp("Admin");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isAdmin).toBe(true);
+    }
+  });
+
+  it("non-admin user is not flagged as admin", async () => {
+    process.env.ADMIN_USERNAME = "admin";
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({
+      id: 2,
+      username: "player1",
+      bracketSubmitted: false,
+      createdAt: "2026-01-01",
+    });
+
+    const result = await enterApp("player1");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isAdmin).toBe(false);
+    }
+  });
+
+  it("defaults isLocked to false", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({
+      id: 1,
+      username: "user1",
+      bracketSubmitted: false,
+      createdAt: "2026-01-01",
+    });
+
+    const result = await enterApp("user1");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isLocked).toBe(false);
+    }
   });
 
   it("handles unique constraint race condition gracefully", async () => {
     const { mockGet, mockValues } = await getDbMocks();
+    // First call: user not found
     mockGet.mockResolvedValueOnce(undefined);
+    // Insert fails with UNIQUE constraint
     mockValues.mockImplementationOnce(() => ({
-      returning: vi.fn().mockRejectedValueOnce(
-        new Error("UNIQUE constraint failed: users.username")
-      ),
+      returning: vi
+        .fn()
+        .mockRejectedValueOnce(
+          new Error("UNIQUE constraint failed: users.username")
+        ),
     }));
-
-    const result = await createUser("RaceUser");
-    expect(result).toEqual({
-      success: false,
-      error: "That name is already taken",
+    // Retry lookup finds the user
+    mockGet.mockResolvedValueOnce({
+      id: 10,
+      username: "raceuser",
+      bracketSubmitted: false,
+      createdAt: "2026-01-01",
     });
+
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await enterApp("RaceUser");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.userId).toBe(10);
+      expect(result.data.isNewUser).toBe(false);
+    }
   });
 
   it("returns generic error for unexpected database failures", async () => {
     const { mockGet } = await getDbMocks();
     mockGet.mockRejectedValueOnce(new Error("Connection refused"));
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = await createUser("FailUser");
+    const consoleSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const result = await enterApp("FailUser");
 
     expect(result).toEqual({
       success: false,

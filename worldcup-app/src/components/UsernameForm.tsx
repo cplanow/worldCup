@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { createUser } from "@/lib/actions/auth";
+import { enterApp } from "@/lib/actions/auth";
 
 export function UsernameForm() {
   const router = useRouter();
@@ -19,10 +19,18 @@ export function UsernameForm() {
     const formData = new FormData(e.currentTarget);
     const username = formData.get("username") as string;
 
-    const result = await createUser(username);
+    const result = await enterApp(username);
 
     if (result.success) {
-      router.push("/bracket");
+      const { bracketSubmitted, isLocked } = result.data;
+
+      if (bracketSubmitted) {
+        router.push("/leaderboard");
+      } else if (isLocked) {
+        router.push("/leaderboard?locked=1");
+      } else {
+        router.push("/bracket");
+      }
     } else {
       setError(result.error);
       setIsSubmitting(false);

@@ -8,9 +8,33 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const MAX_USERNAME_LENGTH = 30;
 
-export async function createUser(
+export interface EnterAppResult {
+  userId: number;
+  username: string;
+  bracketSubmitted: boolean;
+  isAdmin: boolean;
+  isLocked: boolean;
+  isNewUser: boolean;
+}
+
+async function setSessionCookie(username: string) {
+  const cookieStore = await cookies();
+  cookieStore.set("username", username, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+}
+
+function checkIsAdmin(username: string): boolean {
+  const adminUsername = process.env.ADMIN_USERNAME?.toLowerCase();
+  return !!adminUsername && username === adminUsername;
+}
+
+export async function enterApp(
   username: string
-): Promise<ActionResult<{ userId: number }>> {
+): Promise<ActionResult<EnterAppResult>> {
   const trimmed = username.trim().toLowerCase();
 
   if (!trimmed) {
@@ -18,7 +42,10 @@ export async function createUser(
   }
 
   if (trimmed.length > MAX_USERNAME_LENGTH) {
-    return { success: false, error: `Username must be ${MAX_USERNAME_LENGTH} characters or less` };
+    return {
+      success: false,
+      error: `Username must be ${MAX_USERNAME_LENGTH} characters or less`,
+    };
   }
 
   try {
@@ -28,34 +55,74 @@ export async function createUser(
       .where(eq(users.username, trimmed))
       .get();
 
+    let userId: number;
+    let bracketSubmitted: boolean;
+    let isNewUser: boolean;
+
     if (existing) {
-      return { success: false, error: "That name is already taken" };
+      userId = existing.id;
+      bracketSubmitted = existing.bracketSubmitted;
+      isNewUser = false;
+    } else {
+      const result = await db
+        .insert(users)
+        .values({ username: trimmed })
+        .returning();
+      userId = result[0].id;
+      bracketSubmitted = false;
+      isNewUser = true;
     }
 
-    const result = await db
-      .insert(users)
-      .values({ username: trimmed })
-      .returning();
+    await setSessionCookie(trimmed);
 
-    const cookieStore = await cookies();
-    cookieStore.set("username", trimmed, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    // TODO: Check bracket lock status from tournament_config table (Story 2.2)
+    const isLocked = false;
 
-    return { success: true, data: { userId: result[0].id } };
+    return {
+      success: true,
+      data: {
+        userId,
+        username: trimmed,
+        bracketSubmitted,
+        isAdmin: checkIsAdmin(trimmed),
+        isLocked,
+        isNewUser,
+      },
+    };
   } catch (error) {
-    console.error("createUser failed:", error);
+    console.error("enterApp failed:", error);
 
     if (
       error instanceof Error &&
       error.message.includes("UNIQUE constraint failed")
     ) {
-      return { success: false, error: "That name is already taken" };
+      // Race condition: user was created between our check and insert
+      const existing = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, trimmed))
+        .get();
+
+      if (existing) {
+        await setSessionCookie(trimmed);
+
+        return {
+          success: true,
+          data: {
+            userId: existing.id,
+            username: trimmed,
+            bracketSubmitted: existing.bracketSubmitted,
+            isAdmin: checkIsAdmin(trimmed),
+            isLocked: false,
+            isNewUser: false,
+          },
+        };
+      }
     }
 
-    return { success: false, error: "Something went wrong. Please try again." };
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
   }
 }
