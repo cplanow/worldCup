@@ -1,6 +1,6 @@
 # Story 1.1: Project Initialization & Deployment
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -80,9 +80,9 @@ so that I have a working foundation to build features on.
 - [x] Task 6: Push to GitHub and deploy to Vercel (AC: #5)
   - [x] Initialize git repo (if not already), commit all files
   - [x] Push to GitHub repository
-  - [ ] Connect Vercel to the GitHub repo via Git integration
-  - [ ] Configure environment variables in Vercel dashboard: `TURSO_CONNECTION_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_USERNAME`
-  - [ ] Verify deployment succeeds and app is accessible at public URL
+  - [x] Connect Vercel to the GitHub repo via Git integration
+  - [x] Configure environment variables in Vercel dashboard: `TURSO_CONNECTION_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_USERNAME`
+  - [x] Verify deployment succeeds and app is accessible at public URL
 
 ## Dev Notes
 

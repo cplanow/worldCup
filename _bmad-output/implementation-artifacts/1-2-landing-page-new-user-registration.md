@@ -1,6 +1,6 @@
 # Story 1.2: Landing Page & New User Registration
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -288,19 +288,20 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-02-17: Story 1.2 implementation — landing page, user registration, database schema, server actions, tests.
+- 2026-02-17: Code review fixes — added try/catch error handling, username length validation (max 30), case-insensitive usernames (lowercase normalization), TOCTOU race condition handling, console.error logging, removed redundant username index, moved tests to co-located positions. 12 tests (3 new).
 
 ### File List
 
-- worldcup-app/src/db/schema.ts (modified — added users table)
+- worldcup-app/src/db/schema.ts (modified — added users table, removed redundant index)
 - worldcup-app/src/db/migrations/0000_flat_kronos.sql (new — generated migration)
 - worldcup-app/src/db/migrations/meta/0000_snapshot.json (new — drizzle metadata)
 - worldcup-app/src/db/migrations/meta/_journal.json (new — drizzle metadata)
-- worldcup-app/src/lib/actions/auth.ts (new — createUser server action)
+- worldcup-app/src/lib/actions/auth.ts (new — createUser server action with error handling)
+- worldcup-app/src/lib/actions/auth.test.ts (new — createUser unit tests, co-located)
 - worldcup-app/src/app/page.tsx (replaced — landing page with username form)
 - worldcup-app/src/app/bracket/page.tsx (new — placeholder bracket page)
 - worldcup-app/src/components/UsernameForm.tsx (new — client component for username form)
+- worldcup-app/src/components/UsernameForm.test.tsx (new — component tests, co-located)
 - worldcup-app/src/types/index.ts (modified — added User type)
-- worldcup-app/src/__tests__/auth.test.ts (new — createUser unit tests)
-- worldcup-app/src/__tests__/UsernameForm.test.tsx (new — component tests)
 - worldcup-app/vitest.config.mts (new — vitest configuration)
 - worldcup-app/package.json (modified — added test deps and scripts)

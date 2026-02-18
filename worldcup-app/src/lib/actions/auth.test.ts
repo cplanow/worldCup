@@ -37,7 +37,7 @@ import { cookies } from "next/headers";
 
 // Access the mock internals
 const getDbMocks = async () => {
-  const mod = await import("@/db") as { __mocks: { mockGet: ReturnType<typeof vi.fn>; mockReturning: ReturnType<typeof vi.fn> } };
+  const mod = await import("@/db") as { __mocks: { mockGet: ReturnType<typeof vi.fn>; mockReturning: ReturnType<typeof vi.fn>; mockValues: ReturnType<typeof vi.fn> } };
   return mod.__mocks;
 };
 
@@ -64,7 +64,7 @@ describe("createUser", () => {
 
   it("returns error when username already exists", async () => {
     const { mockGet } = await getDbMocks();
-    mockGet.mockResolvedValueOnce({ id: 1, username: "Chris" });
+    mockGet.mockResolvedValueOnce({ id: 1, username: "chris" });
 
     const result = await createUser("Chris");
     expect(result).toEqual({
@@ -86,7 +86,7 @@ describe("createUser", () => {
     });
 
     const cookieStore = await (cookies as ReturnType<typeof vi.fn>)();
-    expect(cookieStore.set).toHaveBeenCalledWith("username", "NewUser", {
+    expect(cookieStore.set).toHaveBeenCalledWith("username", "newuser", {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
@@ -94,12 +94,12 @@ describe("createUser", () => {
     });
   });
 
-  it("trims whitespace from username before processing", async () => {
+  it("trims and lowercases username before processing", async () => {
     const { mockGet, mockReturning } = await getDbMocks();
     mockGet.mockResolvedValueOnce(undefined);
     mockReturning.mockResolvedValueOnce([{ id: 5 }]);
 
-    const result = await createUser("  trimmed  ");
+    const result = await createUser("  Trimmed  ");
 
     expect(result).toEqual({
       success: true,
@@ -112,5 +112,45 @@ describe("createUser", () => {
       "trimmed",
       expect.any(Object)
     );
+  });
+
+  it("returns error when username exceeds max length", async () => {
+    const longName = "a".repeat(31);
+    const result = await createUser(longName);
+    expect(result).toEqual({
+      success: false,
+      error: "Username must be 30 characters or less",
+    });
+  });
+
+  it("handles unique constraint race condition gracefully", async () => {
+    const { mockGet, mockValues } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined);
+    mockValues.mockImplementationOnce(() => ({
+      returning: vi.fn().mockRejectedValueOnce(
+        new Error("UNIQUE constraint failed: users.username")
+      ),
+    }));
+
+    const result = await createUser("RaceUser");
+    expect(result).toEqual({
+      success: false,
+      error: "That name is already taken",
+    });
+  });
+
+  it("returns generic error for unexpected database failures", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await createUser("FailUser");
+
+    expect(result).toEqual({
+      success: false,
+      error: "Something went wrong. Please try again.",
+    });
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 });

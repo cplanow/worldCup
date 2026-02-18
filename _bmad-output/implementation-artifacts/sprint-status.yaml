@@ -41,8 +41,8 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   epic-1: in-progress
-  1-1-project-initialization-deployment: in-progress
-  1-2-landing-page-new-user-registration: review
+  1-1-project-initialization-deployment: done
+  1-2-landing-page-new-user-registration: done
   1-3-returning-user-access-state-based-routing: ready-for-dev
   epic-1-retrospective: optional
 

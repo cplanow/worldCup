@@ -9,7 +9,18 @@
       "Bash(npx shadcn@latest init:*)",
       "Bash(npx shadcn@latest add:*)",
       "Bash(npm install:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm test:*)",
+      "Bash(vercel project ls:*)",
+      "Bash(vercel git ls:*)",
+      "Bash(vercel ls:*)"
     ]
   }
 }
