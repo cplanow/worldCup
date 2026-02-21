@@ -52,3 +52,49 @@ export type BracketState = {
   totalPicks: number;
   maxPicks: number;
 };
+
+export type Result = {
+  id: number;
+  matchId: number;
+  winner: string;
+  createdAt: string;
+};
+
+export type MatchCardMode = "entry" | "readonly";
+
+export interface MaxPointsInput {
+  picks: { matchId: number; selectedTeam: string }[];
+  results: { matchId: number; winner: string }[];
+  matches: { id: number; round: number; teamA: string | null; teamB: string | null }[];
+  pointsPerRound: Record<number, number>;
+  currentScore: number;
+}
+
+export interface EliminationInput {
+  maxPossible: number;
+  leaderScore: number;
+}
+
+export interface LeaderboardEntry {
+  userId: number;
+  username: string;
+  score: number;
+  maxPossible: number;
+  championPick: string | null;
+  isChampionEliminated: boolean;
+  isEliminated: boolean;
+  rank: number;
+}
+
+export interface ScoreInput {
+  picks: { matchId: number; selectedTeam: string }[];
+  results: { matchId: number; winner: string }[];
+  matches: { id: number; round: number }[];
+  pointsPerRound: Record<number, number>;
+}
+
+export interface PlayerScore {
+  userId: number;
+  username: string;
+  score: number;
+}

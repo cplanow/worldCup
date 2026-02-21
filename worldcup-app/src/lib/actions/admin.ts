@@ -3,10 +3,10 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { matches, tournamentConfig } from "@/db/schema";
+import { matches, tournamentConfig, results } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
-import type { TournamentConfig } from "@/types";
+import type { TournamentConfig, Result } from "@/types";
 
 async function verifyAdmin(): Promise<boolean> {
   const cookieStore = await cookies();
@@ -210,4 +210,95 @@ export async function initializeBracketStructure(): Promise<
   revalidatePath("/admin");
   revalidatePath("/bracket");
   return { success: true, data: { created: placeholders.length } };
+}
+
+export async function getResults(): Promise<ActionResult<Result[]>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const data = await db.select().from(results).all();
+    return { success: true, data };
+  } catch (error) {
+    console.error("getResults failed:", error);
+    return { success: false, error: "Failed to load results" };
+  }
+}
+
+export async function enterResult(data: {
+  matchId: number;
+  winner: string;
+}): Promise<ActionResult<null>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const match = await db
+    .select()
+    .from(matches)
+    .where(eq(matches.id, data.matchId))
+    .get();
+
+  if (!match) return { success: false, error: "Match not found" };
+
+  if (!match.teamA || !match.teamB) {
+    return { success: false, error: "Match teams are not yet determined" };
+  }
+
+  if (data.winner !== match.teamA && data.winner !== match.teamB) {
+    return { success: false, error: "Winner must be one of the teams in this match" };
+  }
+
+  // Upsert result
+  const existing = await db
+    .select()
+    .from(results)
+    .where(eq(results.matchId, data.matchId))
+    .get();
+
+  if (existing) {
+    await db
+      .update(results)
+      .set({ winner: data.winner })
+      .where(eq(results.id, existing.id));
+  } else {
+    await db.insert(results).values({ matchId: data.matchId, winner: data.winner });
+  }
+
+  // Update denormalized winner on matches table
+  await db
+    .update(matches)
+    .set({ winner: data.winner })
+    .where(eq(matches.id, data.matchId));
+
+  // Advance winner to next round
+  await advanceWinner(match.round, match.position, data.winner);
+
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  revalidatePath("/bracket");
+
+  return { success: true, data: null };
+}
+
+async function advanceWinner(round: number, position: number, winner: string) {
+  if (round >= 5) return; // Final — no next round
+
+  const nextRound = round + 1;
+  const nextPosition = Math.ceil(position / 2);
+  const isTeamA = position % 2 === 1; // Odd position → teamA slot
+
+  const nextMatch = await db
+    .select()
+    .from(matches)
+    .where(and(eq(matches.round, nextRound), eq(matches.position, nextPosition)))
+    .get();
+
+  if (nextMatch) {
+    await db
+      .update(matches)
+      .set(isTeamA ? { teamA: winner } : { teamB: winner })
+      .where(eq(matches.id, nextMatch.id));
+  }
 }

@@ -4,6 +4,9 @@ import {
   getFeederPositions,
   getMatchSlot,
   computeBracketState,
+  getCascadingClears,
+  validatePick,
+  getAvailableMatches,
   ROUND_NAMES,
   MATCHES_PER_ROUND,
   MAX_PICKS,
@@ -207,5 +210,183 @@ describe("computeBracketState", () => {
     ];
     const state = computeBracketState(matches, picks);
     expect(state.rounds[0].matches[0].selectedTeam).toBe("Brazil");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fixture helpers for cascade tests
+// ---------------------------------------------------------------------------
+// Minimal 5-round bracket: R32 pos 1&2, R16 pos 1, QF pos 1, SF pos 1, Final pos 1
+function makeCascadeFixture() {
+  const allMatches: Match[] = [
+    makeMatch({ id: 1, round: 1, position: 1, teamA: "Brazil", teamB: "Mexico" }),
+    makeMatch({ id: 2, round: 1, position: 2, teamA: "Argentina", teamB: "Australia" }),
+    makeMatch({ id: 17, round: 2, position: 1, teamA: "", teamB: "" }),
+    makeMatch({ id: 25, round: 3, position: 1, teamA: "", teamB: "" }),
+    makeMatch({ id: 29, round: 4, position: 1, teamA: "", teamB: "" }),
+    makeMatch({ id: 31, round: 5, position: 1, teamA: "", teamB: "" }),
+  ];
+  return allMatches;
+}
+
+describe("getCascadingClears", () => {
+  it("returns empty array when no downstream picks exist", () => {
+    const allMatches = makeCascadeFixture();
+    const result = getCascadingClears(1, "Brazil", [], allMatches);
+    expect(result).toEqual([]);
+  });
+
+  it("clears one downstream match when picked team was selected in next round", () => {
+    const allMatches = makeCascadeFixture();
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1, selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 2, selectedTeam: "Argentina" }),
+      makePick({ id: 12, matchId: 17, selectedTeam: "Brazil" }),
+    ];
+    // Changing R32 pos1 away from Brazil — R16 pos1 pick (Brazil) should clear
+    const result = getCascadingClears(1, "Brazil", picks, allMatches);
+    expect(result).toContain(17);
+  });
+
+  it("cascades through multiple rounds", () => {
+    const allMatches = makeCascadeFixture();
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1,  selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 2,  selectedTeam: "Argentina" }),
+      makePick({ id: 12, matchId: 17, selectedTeam: "Brazil" }),
+      makePick({ id: 13, matchId: 25, selectedTeam: "Brazil" }),
+      makePick({ id: 14, matchId: 29, selectedTeam: "Brazil" }),
+    ];
+    const result = getCascadingClears(1, "Brazil", picks, allMatches);
+    expect(result).toEqual([17, 25, 29]);
+  });
+
+  it("stops cascade when team was not picked in next round", () => {
+    const allMatches = makeCascadeFixture();
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1,  selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 2,  selectedTeam: "Argentina" }),
+      makePick({ id: 12, matchId: 17, selectedTeam: "Argentina" }), // Argentina picked, not Brazil
+    ];
+    // Brazil cleared from R32 pos1 — R16 pos1 has Argentina picked, so cascade stops
+    const result = getCascadingClears(1, "Brazil", picks, allMatches);
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array for unknown match id", () => {
+    const allMatches = makeCascadeFixture();
+    const result = getCascadingClears(999, "Brazil", [], allMatches);
+    expect(result).toEqual([]);
+  });
+
+  it("cascades all the way through to the Final round", () => {
+    const allMatches = makeCascadeFixture();
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1,  selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 2,  selectedTeam: "Argentina" }),
+      makePick({ id: 12, matchId: 17, selectedTeam: "Brazil" }),
+      makePick({ id: 13, matchId: 25, selectedTeam: "Brazil" }),
+      makePick({ id: 14, matchId: 29, selectedTeam: "Brazil" }),
+      makePick({ id: 15, matchId: 31, selectedTeam: "Brazil" }), // Final pick
+    ];
+    const result = getCascadingClears(1, "Brazil", picks, allMatches);
+    expect(result).toEqual([17, 25, 29, 31]);
+  });
+
+  it("stops when no next-round match exists in data", () => {
+    // Only R32 and R16 matches — no QF
+    const limitedMatches: Match[] = [
+      makeMatch({ id: 1, round: 1, position: 1, teamA: "Brazil", teamB: "Mexico" }),
+      makeMatch({ id: 2, round: 1, position: 2, teamA: "Argentina", teamB: "Australia" }),
+      makeMatch({ id: 17, round: 2, position: 1, teamA: "", teamB: "" }),
+    ];
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1,  selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 17, selectedTeam: "Brazil" }),
+    ];
+    const result = getCascadingClears(1, "Brazil", picks, limitedMatches);
+    // R16 pos 1 should be cleared; no QF match exists, so stops there
+    expect(result).toEqual([17]);
+  });
+});
+
+describe("validatePick", () => {
+  const allMatches = makeCascadeFixture();
+
+  it("returns true for valid R32 teamA pick", () => {
+    expect(validatePick(1, "Brazil", allMatches, [])).toBe(true);
+  });
+
+  it("returns true for valid R32 teamB pick", () => {
+    expect(validatePick(1, "Mexico", allMatches, [])).toBe(true);
+  });
+
+  it("returns false for invalid R32 team", () => {
+    expect(validatePick(1, "France", allMatches, [])).toBe(false);
+  });
+
+  it("returns false for unknown matchId", () => {
+    expect(validatePick(999, "Brazil", allMatches, [])).toBe(false);
+  });
+
+  it("returns false for later-round match when feeders not picked", () => {
+    expect(validatePick(17, "Brazil", allMatches, [])).toBe(false);
+  });
+
+  it("returns true for later-round match when both feeders are picked", () => {
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1, selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 2, selectedTeam: "Argentina" }),
+    ];
+    expect(validatePick(17, "Brazil", allMatches, picks)).toBe(true);
+    expect(validatePick(17, "Argentina", allMatches, picks)).toBe(true);
+  });
+
+  it("returns false for later-round when only one feeder is picked", () => {
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1, selectedTeam: "Brazil" }),
+    ];
+    expect(validatePick(17, "Brazil", allMatches, picks)).toBe(false);
+  });
+});
+
+describe("getAvailableMatches", () => {
+  it("returns all R32 match ids when no picks exist (teams present)", () => {
+    const r32: Match[] = [
+      makeMatch({ id: 1, round: 1, position: 1, teamA: "Brazil", teamB: "Germany" }),
+      makeMatch({ id: 2, round: 1, position: 2, teamA: "France", teamB: "Spain" }),
+    ];
+    const result = getAvailableMatches(r32, []);
+    expect(result).toContain(1);
+    expect(result).toContain(2);
+  });
+
+  it("excludes R32 matches where both teams are empty", () => {
+    const matches: Match[] = [
+      makeMatch({ id: 1, round: 1, position: 1, teamA: "Brazil", teamB: "Germany" }),
+      makeMatch({ id: 2, round: 1, position: 2, teamA: "", teamB: "" }),
+    ];
+    const result = getAvailableMatches(matches, []);
+    expect(result).toContain(1);
+    expect(result).not.toContain(2);
+  });
+
+  it("excludes later-round match when feeders not picked", () => {
+    const allMatches = makeCascadeFixture();
+    const result = getAvailableMatches(allMatches, []);
+    expect(result).toContain(1);
+    expect(result).toContain(2);
+    expect(result).not.toContain(17); // R16 — no feeder picks
+  });
+
+  it("includes later-round match when both feeders are picked", () => {
+    const allMatches = makeCascadeFixture();
+    const picks: Pick[] = [
+      makePick({ id: 10, matchId: 1, selectedTeam: "Brazil" }),
+      makePick({ id: 11, matchId: 2, selectedTeam: "Argentina" }),
+    ];
+    const result = getAvailableMatches(allMatches, picks);
+    expect(result).toContain(17);
+    expect(result).not.toContain(25); // QF — R16 picks not made
   });
 });

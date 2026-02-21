@@ -1,11 +1,14 @@
 "use client";
 
+import type { MatchCardMode } from "@/types";
+
 interface MatchCardProps {
   matchId: number;
   teamA: string | null;
   teamB: string | null;
   selectedTeam: string | null;
   disabled: boolean;
+  mode: MatchCardMode;
   onSelect: (matchId: number, team: string) => void;
 }
 
@@ -15,25 +18,49 @@ function TeamRow({
   isTop,
   disabled,
   onClick,
+  mode,
 }: {
   team: string | null;
   isSelected: boolean;
   isTop: boolean;
   disabled: boolean;
   onClick: () => void;
+  mode: MatchCardMode;
 }) {
+  const cornerClass = isTop ? "rounded-t-lg" : "rounded-b-lg";
+  const baseClass = `flex min-h-[44px] items-center px-3 py-2 text-sm ${cornerClass}`;
+
   if (!team) {
     return (
-      <div
-        className={`flex min-h-[44px] items-center px-3 py-2 ${
-          isTop ? "rounded-t-lg" : "rounded-b-lg"
-        } bg-slate-50`}
-      >
+      <div className={`${baseClass} bg-slate-50`}>
         <span className="text-sm text-slate-300">TBD</span>
       </div>
     );
   }
 
+  if (mode === "readonly") {
+    return (
+      <div
+        className={`${baseClass} ${isSelected ? "bg-slate-100 text-slate-900" : "bg-white text-slate-900"}`}
+        aria-label={isSelected ? `${team} — your pick` : team}
+      >
+        <span className="truncate">{team}</span>
+        {isSelected && (
+          <svg
+            className="ml-2 h-4 w-4 shrink-0 text-slate-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </div>
+    );
+  }
+
+  // entry mode
   return (
     <button
       type="button"
@@ -41,9 +68,7 @@ function TeamRow({
       disabled={disabled}
       aria-label={`${team} wins`}
       aria-pressed={isSelected}
-      className={`flex min-h-[44px] w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
-        isTop ? "rounded-t-lg" : "rounded-b-lg"
-      } ${
+      className={`${baseClass} w-full text-left transition-colors justify-between ${
         disabled
           ? "cursor-not-allowed bg-slate-100 text-slate-400"
           : isSelected
@@ -73,6 +98,7 @@ export function MatchCard({
   teamB,
   selectedTeam,
   disabled,
+  mode,
   onSelect,
 }: MatchCardProps) {
   const isEmpty = !teamA && !teamB;
@@ -89,6 +115,7 @@ export function MatchCard({
         isTop={true}
         disabled={disabled || !teamA}
         onClick={() => teamA && onSelect(matchId, teamA)}
+        mode={mode}
       />
       {!isEmpty && <div className="border-t border-slate-200" />}
       <TeamRow
@@ -97,6 +124,7 @@ export function MatchCard({
         isTop={false}
         disabled={disabled || !teamB}
         onClick={() => teamB && onSelect(matchId, teamB)}
+        mode={mode}
       />
     </div>
   );

@@ -75,6 +75,79 @@ export function getMatchSlot(
 }
 
 /**
+ * Given a pick change, returns the match IDs of all downstream picks that
+ * must be cleared because they reference the removed team.
+ */
+export function getCascadingClears(
+  changedMatchId: number,
+  previousTeam: string,
+  allPicks: Pick[],
+  allMatches: Match[]
+): number[] {
+  const clearIds: number[] = [];
+  const match = allMatches.find((m) => m.id === changedMatchId);
+  if (!match) return clearIds;
+
+  let currentRound = match.round;
+  let currentPosition = match.position;
+
+  while (currentRound < 5) {
+    const nextRound = currentRound + 1;
+    const nextPosition = Math.ceil(currentPosition / 2);
+
+    const nextMatch = allMatches.find(
+      (m) => m.round === nextRound && m.position === nextPosition
+    );
+    if (!nextMatch) break;
+
+    const pickForNext = allPicks.find((p) => p.matchId === nextMatch.id);
+    if (pickForNext && pickForNext.selectedTeam === previousTeam) {
+      clearIds.push(nextMatch.id);
+      currentRound = nextRound;
+      currentPosition = nextPosition;
+    } else {
+      break;
+    }
+  }
+
+  return clearIds;
+}
+
+/**
+ * Validates whether a pick is legal: team must be one of the two teams
+ * in the match, and the match must be available (both feeder picks made
+ * for later rounds).
+ */
+export function validatePick(
+  matchId: number,
+  team: string,
+  matches: Match[],
+  picks: Pick[]
+): boolean {
+  const match = matches.find((m) => m.id === matchId);
+  if (!match) return false;
+
+  const slot = getMatchSlot(match.round, match.position, picks, matches);
+  if (!slot.teamA || !slot.teamB) return false;
+
+  return team === slot.teamA || team === slot.teamB;
+}
+
+/**
+ * Returns match IDs where both teams are determined and the match can be
+ * picked. R32 matches are always available (assuming teamA/teamB are set).
+ * Later-round matches are available once both feeder picks have been made.
+ */
+export function getAvailableMatches(matches: Match[], picks: Pick[]): number[] {
+  return matches
+    .filter((match) => {
+      const slot = getMatchSlot(match.round, match.position, picks, matches);
+      return !!slot.teamA && !!slot.teamB;
+    })
+    .map((match) => match.id);
+}
+
+/**
  * Computes the full bracket state for rendering.
  * @param matches - All matches from the DB (R32 + later-round placeholders)
  * @param picks - Picks for a SINGLE user (not all users). Pass pre-filtered picks.

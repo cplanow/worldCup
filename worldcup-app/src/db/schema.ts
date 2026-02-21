@@ -34,6 +34,13 @@ export const matches = sqliteTable("matches", {
   index("idx_matches_round_position").on(table.round, table.position),
 ]);
 
+export const results = sqliteTable("results", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  matchId: integer("match_id").notNull().references(() => matches.id).unique(),
+  winner: text("winner").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 export const picks = sqliteTable("picks", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull().references(() => users.id),

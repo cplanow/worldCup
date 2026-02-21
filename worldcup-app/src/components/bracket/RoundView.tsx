@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { MatchCard } from "./MatchCard";
-import type { BracketState } from "@/types";
+import type { BracketState, MatchCardMode } from "@/types";
 
 interface RoundViewProps {
   bracketState: BracketState;
   onSelect: (matchId: number, team: string) => void;
   disabled: boolean;
+  mode: MatchCardMode;
+  progressBar?: React.ReactNode;
+  submitSection?: React.ReactNode;
 }
 
-export function RoundView({ bracketState, onSelect, disabled }: RoundViewProps) {
+export function RoundView({ bracketState, onSelect, disabled, mode, progressBar, submitSection }: RoundViewProps) {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const round = bracketState.rounds[currentRoundIndex];
   const isFirst = currentRoundIndex === 0;
@@ -69,6 +72,9 @@ export function RoundView({ bracketState, onSelect, disabled }: RoundViewProps) 
         ))}
       </div>
 
+      {/* Progress bar: below navigation, above MatchCards */}
+      {progressBar && <div className="mb-4">{progressBar}</div>}
+
       {/* Match cards */}
       <div className="flex flex-col items-center gap-3">
         {round.matches.map((slot) => (
@@ -78,11 +84,15 @@ export function RoundView({ bracketState, onSelect, disabled }: RoundViewProps) 
             teamA={slot.teamA}
             teamB={slot.teamB}
             selectedTeam={slot.selectedTeam}
-            disabled={disabled}
+            disabled={disabled || !slot.teamA || !slot.teamB}
+            mode={mode}
             onSelect={onSelect}
           />
         ))}
       </div>
+
+      {/* Submit section: below MatchCards */}
+      {submitSection && <div className="mt-4">{submitSection}</div>}
     </div>
   );
 }

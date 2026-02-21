@@ -1,13 +1,13 @@
 "use client";
 
 import { MatchCard } from "./MatchCard";
-import { ROUND_NAMES } from "@/lib/bracket-utils";
-import type { BracketState } from "@/types";
+import type { BracketState, MatchCardMode } from "@/types";
 
 interface BracketTreeProps {
   bracketState: BracketState;
   onSelect: (matchId: number, team: string) => void;
   disabled: boolean;
+  mode: MatchCardMode;
 }
 
 function ConnectorLines({ matchCount }: { matchCount: number }) {
@@ -17,7 +17,7 @@ function ConnectorLines({ matchCount }: { matchCount: number }) {
     <div className="flex flex-col justify-around flex-1">
       {Array.from({ length: pairs }, (_, i) => (
         <div key={i} className="flex flex-col items-stretch" style={{ flex: 1 }}>
-          <div className="flex flex-col justify-center flex-1">
+          <div className="relative flex flex-col justify-center flex-1">
             {/* Top horizontal line */}
             <div className="flex items-end flex-1">
               <div className="w-4 border-b-2 border-r-2 border-slate-200" style={{ height: "50%" }} />
@@ -26,16 +26,19 @@ function ConnectorLines({ matchCount }: { matchCount: number }) {
             <div className="flex items-start flex-1">
               <div className="w-4 border-t-2 border-r-2 border-slate-200" style={{ height: "50%" }} />
             </div>
+            {/* Output horizontal line from bracket midpoint to next round column */}
+            <div
+              className="absolute border-b-2 border-slate-200"
+              style={{ left: "1rem", right: 0, top: "50%" }}
+            />
           </div>
-          {/* Output horizontal line to next round */}
-          <div className="absolute" />
         </div>
       ))}
     </div>
   );
 }
 
-export function BracketTree({ bracketState, onSelect, disabled }: BracketTreeProps) {
+export function BracketTree({ bracketState, onSelect, disabled, mode }: BracketTreeProps) {
   return (
     <div className="hidden md:block overflow-x-auto pb-4">
       <div className="flex px-4 py-4" style={{ minWidth: "fit-content" }}>
@@ -56,7 +59,8 @@ export function BracketTree({ bracketState, onSelect, disabled }: BracketTreePro
                       teamA={slot.teamA}
                       teamB={slot.teamB}
                       selectedTeam={slot.selectedTeam}
-                      disabled={disabled}
+                      disabled={disabled || !slot.teamA || !slot.teamB}
+                      mode={mode}
                       onSelect={onSelect}
                     />
                   </div>

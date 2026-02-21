@@ -51,22 +51,22 @@ development_status:
   2-2-bracket-lock-control: done
   epic-2-retrospective: optional
 
-  epic-3: in-progress
+  epic-3: done
   3-1-bracket-data-model-match-display: done
-  3-2-tap-to-pick-with-cascading-logic: ready-for-dev
-  3-3-progress-tracking-submission: ready-for-dev
-  3-4-read-only-bracket-view: ready-for-dev
+  3-2-tap-to-pick-with-cascading-logic: done
+  3-3-progress-tracking-submission: done
+  3-4-read-only-bracket-view: done
   epic-3-retrospective: optional
 
   epic-4: in-progress
-  4-1-scoring-engine-core-calculation-tests: ready-for-dev
-  4-2-max-possible-points-elimination-logic: ready-for-dev
-  4-3-tiebreaker-logic: ready-for-dev
-  4-4-leaderboard-display: ready-for-dev
+  4-1-scoring-engine-core-calculation-tests: done
+  4-2-max-possible-points-elimination-logic: done
+  4-3-tiebreaker-logic: done
+  4-4-leaderboard-display: done
   epic-4-retrospective: optional
 
   epic-5: in-progress
-  5-1-admin-result-entry: ready-for-dev
+  5-1-admin-result-entry: done
   5-2-admin-result-correction: ready-for-dev
   5-3-color-coded-bracket-results: ready-for-dev
   5-4-view-other-participants-brackets: ready-for-dev

@@ -1,6 +1,6 @@
 # Story 3.3: Progress Tracking & Submission
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,57 +39,57 @@ so that I can lock in my 31 predictions and join the competition.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Build ProgressBar component (AC: #1)
-  - [ ] Create `src/components/bracket/ProgressBar.tsx` (client component)
-  - [ ] Props: `current: number`, `total: number` (always 31)
-  - [ ] Display: text counter "X of 31 picks made" above a thin horizontal fill bar
-  - [ ] Fill bar: Emerald 500 fill on Slate 200 track
-  - [ ] Fill width: `(current / total) * 100%`
-  - [ ] Accessibility: `role="progressbar"`, `aria-valuenow={current}`, `aria-valuemax={total}`, `aria-label="Bracket completion progress"`
-  - [ ] Text: 14px, Slate 500 color (supporting text size per UX spec)
-  - [ ] Bar height: 4-6px, rounded corners
+- [x] Task 1: Build ProgressBar component (AC: #1)
+  - [x] Create `src/components/bracket/ProgressBar.tsx` (client component)
+  - [x] Props: `current: number`, `total: number` (always 31)
+  - [x] Display: text counter "X of 31 picks made" above a thin horizontal fill bar
+  - [x] Fill bar: Emerald 500 fill on Slate 200 track
+  - [x] Fill width: `(current / total) * 100%`
+  - [x] Accessibility: `role="progressbar"`, `aria-valuenow={current}`, `aria-valuemax={total}`, `aria-label="Bracket completion progress"`
+  - [x] Text: 14px, Slate 500 color (supporting text size per UX spec)
+  - [x] Bar height: 4-6px, rounded corners
 
-- [ ] Task 2: Implement submitBracket Server Action (AC: #4)
-  - [ ] Add to `src/lib/actions/bracket.ts`:
-  - [ ] `submitBracket(userId: number): Promise<ActionResult<null>>`
+- [x] Task 2: Implement submitBracket Server Action (AC: #4)
+  - [x] Add to `src/lib/actions/bracket.ts`:
+  - [x] `submitBracket(userId: number): Promise<ActionResult<null>>`
     - Step 1: Check bracket lock → reject if locked
     - Step 2: Validate user exists and bracket not already submitted
     - Step 3: Count user's picks — reject if count < 31
     - Step 4: Update `users.bracket_submitted = true`
     - Step 5: Return success
-  - [ ] Server-side pick count validation is critical — never trust client-side count alone (NFR6 spirit)
+  - [x] Server-side pick count validation is critical — never trust client-side count alone (NFR6 spirit)
 
-- [ ] Task 3: Add submit button and wire up to BracketView (AC: #2, #3, #4, #5)
-  - [ ] Update `src/components/bracket/BracketView.tsx`:
-  - [ ] Add submit section below the bracket (both desktop and mobile views)
-  - [ ] Use shadcn/ui `Button` component for "Submit Bracket"
-  - [ ] Button states:
+- [x] Task 3: Add submit button and wire up to BracketView (AC: #2, #3, #4, #5)
+  - [x] Update `src/components/bracket/BracketView.tsx`:
+  - [x] Add submit section below the bracket (both desktop and mobile views)
+  - [x] Use shadcn/ui `Button` component for "Submit Bracket"
+  - [x] Button states:
     - Disabled (`pickCount < 31`): Slate 100 bg, Slate 400 text, cursor-not-allowed
     - Active (`pickCount === 31`): Slate 900 bg, white text, 16px semibold
     - Loading (during submission): Slate 100 bg, Slate 400 text, "Submitting..." text, disabled
-  - [ ] On submit click:
+  - [x] On submit click:
     1. Set loading state
     2. Call `submitBracket(userId)` Server Action
     3. On success: `router.push("/leaderboard")`
     4. On error: display inline error message, restore button state
-  - [ ] Disabled button stays visible — never hide it. It communicates "complete all picks first."
+  - [x] Disabled button stays visible — never hide it. It communicates "complete all picks first."
 
-- [ ] Task 4: Integrate ProgressBar into BracketView (AC: #1)
-  - [ ] Update `src/components/bracket/BracketView.tsx`:
-  - [ ] Compute `pickCount` from local picks state (length of picks array)
-  - [ ] Render ProgressBar:
+- [x] Task 4: Integrate ProgressBar into BracketView (AC: #1)
+  - [x] Update `src/components/bracket/BracketView.tsx`:
+  - [x] Compute `pickCount` from local picks state (length of picks array)
+  - [x] Render ProgressBar:
     - Desktop (BracketTree): fixed position at top or bottom of bracket area
     - Mobile (RoundView): below round navigation header, above MatchCards (per UX spec)
-  - [ ] ProgressBar updates instantly on every pick or cascade clear — driven by local state, not server
+  - [x] ProgressBar updates instantly on every pick or cascade clear — driven by local state, not server
 
-- [ ] Task 5: Handle post-submission read-only state (AC: #5)
-  - [ ] After successful submission, bracket becomes read-only
-  - [ ] If user returns to `/bracket` after submission:
+- [x] Task 5: Handle post-submission read-only state (AC: #5)
+  - [x] After successful submission, bracket becomes read-only
+  - [x] If user returns to `/bracket` after submission:
     - Server Component detects `bracketSubmitted === true`
     - Pass `isReadOnly={true}` to BracketView
     - BracketView hides ProgressBar and Submit button
     - All MatchCards rendered with `disabled={true}` (no hover, no tap interaction)
-  - [ ] This is handled by existing bracket page Server Component logic from Story 3.1
+  - [x] This is handled by existing bracket page Server Component logic from Story 3.1
 
 ## Dev Notes
 
@@ -299,10 +299,34 @@ Manual testing checklist:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-6
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Created `ProgressBar.tsx` from spec: `role="progressbar"`, aria attributes, emerald fill bar, slate text. 4 tests pass.
+- Added `submitBracket()` to `bracket.ts`. Dev notes omitted `.all()` on the picks query — added it. Server validates pick count >= 31 before setting `bracketSubmitted=true`. 6 new tests pass.
+- Updated `BracketView.tsx` with `isSubmitting`/`submitError` states, `handleSubmit()` async function, `useRouter` for post-submission routing. Submit section extracted as a shared ReactNode passed to both desktop (inline below BracketTree) and RoundView (mobile).
+- Updated `RoundView.tsx` to accept optional `progressBar` and `submitSection` ReactNode slots. ProgressBar renders between navigation and MatchCards on mobile; submitSection renders below MatchCards. No logic in RoundView — pure rendering slots.
+- Task 5 (read-only state) verified as already handled: bracket page sets `isReadOnly=user.bracketSubmitted||isLocked`, BracketView guards submit/progress behind `{!isReadOnly}`.
+- Extended `MatchCard.tsx` with `MatchCardMode` type and `mode` prop, adding a `readonly` rendering path (non-interactive divs with slate-100 selected state). Updated `BracketTree.tsx` to accept and pass the `mode` prop. Added `@testing-library/user-event` dependency for MatchCard interaction tests.
+- 22 new tests: ProgressBar 7 (4 original + 3 fill-width), MatchCard 9, submitBracket 6. 126 total tests, all passing. Lint clean.
+
 ### File List
+
+- `worldcup-app/src/components/bracket/ProgressBar.tsx` (created)
+- `worldcup-app/src/components/bracket/ProgressBar.test.tsx` (created)
+- `worldcup-app/src/components/bracket/MatchCard.tsx` (modified)
+- `worldcup-app/src/components/bracket/MatchCard.test.tsx` (created)
+- `worldcup-app/src/components/bracket/BracketTree.tsx` (modified)
+- `worldcup-app/src/components/bracket/BracketView.tsx` (modified)
+- `worldcup-app/src/components/bracket/RoundView.tsx` (modified)
+- `worldcup-app/src/lib/actions/bracket.ts` (modified)
+- `worldcup-app/src/lib/actions/bracket.test.ts` (modified)
+- `worldcup-app/package.json` (modified — added @testing-library/user-event)
+
+## Change Log
+
+- 2026-02-21: Story 3.3 implemented — progress tracking and bracket submission. Added ProgressBar component, submitBracket server action, MatchCardMode with readonly rendering path, submit button with optimistic loading state, mobile/desktop layout integration. 22 new tests, all 126 tests pass.
+- 2026-02-21: Code review fixes — M1: added MatchCard.tsx, MatchCard.test.tsx, BracketTree.tsx, package.json to File List; M2: added 3 fill bar width tests to ProgressBar.test.tsx; M3: moved MatchCardMode type to @/types/index.ts (removed dead "results" union value), updated all importers; M4: corrected test count in completion notes. Also L1: added aria-valuemin={0}; L2: added Math.min clamp on percentage; L3: removed dead "results" union. All 126 tests pass.

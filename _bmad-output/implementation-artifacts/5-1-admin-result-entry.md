@@ -1,6 +1,6 @@
 # Story 5.1: Admin Result Entry
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,15 +39,15 @@ so that scores are calculated and the leaderboard updates for all participants.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define results table schema (AC: #5)
-  - [ ] Add `results` table to `src/db/schema.ts`
-  - [ ] Columns: `id` (integer, primary key, autoincrement), `matchId` (integer, not null, references matches.id, unique), `winner` (text, not null), `createdAt` (text, not null, default ISO 8601)
-  - [ ] Unique constraint on `matchId` — one result per match
-  - [ ] Run `npx drizzle-kit generate` and `npx drizzle-kit migrate`
+- [x] Task 1: Define results table schema (AC: #5)
+  - [x] Add `results` table to `src/db/schema.ts`
+  - [x] Columns: `id` (integer, primary key, autoincrement), `matchId` (integer, not null, references matches.id, unique), `winner` (text, not null), `createdAt` (text, not null, default ISO 8601)
+  - [x] Unique constraint on `matchId` — one result per match
+  - [x] Run `npx drizzle-kit generate` and `npx drizzle-kit migrate`
 
-- [ ] Task 2: Implement enterResult Server Action (AC: #3)
-  - [ ] Add to `src/lib/actions/admin.ts`:
-  - [ ] `enterResult(data: { matchId: number; winner: string }): Promise<ActionResult<null>>`
+- [x] Task 2: Implement enterResult Server Action (AC: #3)
+  - [x] Add to `src/lib/actions/admin.ts`:
+  - [x] `enterResult(data: { matchId: number; winner: string }): Promise<ActionResult<null>>`
     - Verify admin identity
     - Validate match exists
     - Validate winner is one of the teams in that match
@@ -56,23 +56,23 @@ so that scores are calculated and the leaderboard updates for all participants.
     - Also update later-round match slots: the winning team advances to the next match position. Update the `teamA` or `teamB` of the next match based on position mapping.
     - Return success
 
-- [ ] Task 3: Build AdminMatchCard component (AC: #2, #4)
-  - [ ] Create `src/components/admin/AdminMatchCard.tsx` (client component)
-  - [ ] Props: `match: Match`, `result: Result | null`, `onConfirm` callback, `onCancel` callback
-  - [ ] States:
+- [x] Task 3: Build AdminMatchCard component (AC: #2, #4)
+  - [x] Create `src/components/admin/AdminMatchCard.tsx` (client component)
+  - [x] Props: `match: Match`, `result: Result | null`, `onConfirm` callback, `onCancel` callback
+  - [x] States:
     - **Unresolved:** Both teams neutral, slightly more prominent border, tappable
     - **Winner selected (pending confirm):** Selected team highlighted (Emerald 50), confirm/cancel buttons visible below card
     - **Resolved:** Winner highlighted with "Result saved" indicator, tappable to re-enter correction flow (Story 5.2)
-  - [ ] Confirm button: Slate 900 bg, white text, "Confirm Result"
-  - [ ] Cancel button: white bg, Slate 200 border, Slate 700 text, "Cancel"
-  - [ ] Confirmation step is intentional — this is the one place where "are you sure?" is appropriate (per UX spec)
+  - [x] Confirm button: Slate 900 bg, white text, "Confirm Result"
+  - [x] Cancel button: white bg, Slate 200 border, Slate 700 text, "Cancel"
+  - [x] Confirmation step is intentional — this is the one place where "are you sure?" is appropriate (per UX spec)
 
-- [ ] Task 4: Build admin results section (AC: #1)
-  - [ ] Update `src/app/(app)/admin/page.tsx`:
-  - [ ] Add "Match Results" section below bracket lock and matchup setup
-  - [ ] Fetch all matches and results in Server Component
-  - [ ] Group matches by round for display
-  - [ ] Create `src/components/admin/ResultsManager.tsx` (client component):
+- [x] Task 4: Build admin results section (AC: #1)
+  - [x] Update `src/app/(app)/admin/page.tsx`:
+  - [x] Add "Match Results" section below bracket lock and matchup setup
+  - [x] Fetch all matches and results in Server Component
+  - [x] Group matches by round for display
+  - [x] Create `src/components/admin/ResultsManager.tsx` (client component):
     - Displays matches grouped under round headers
     - Unresolved matches visually distinct (bolder border, "No result" badge)
     - Resolved matches show winner with subtle "saved" indicator
@@ -80,16 +80,16 @@ so that scores are calculated and the leaderboard updates for all participants.
     - On confirm: calls `enterResult()` Server Action
     - On success: updates local state to show resolved
 
-- [ ] Task 5: Advance winning team to next round (AC: #3)
-  - [ ] When a result is entered, update the next-round match's team slot:
+- [x] Task 5: Advance winning team to next round (AC: #3)
+  - [x] When a result is entered, update the next-round match's team slot:
     - Winning team from `(round, position)` goes to `(round+1, ceil(position/2))`
     - If position is odd → set `teamA` of next match
     - If position is even → set `teamB` of next match
-  - [ ] This enables later-round matches to display actual team names
-  - [ ] Add `advanceWinner()` helper in `src/lib/actions/admin.ts`
+  - [x] This enables later-round matches to display actual team names
+  - [x] Add `advanceWinner()` helper in `src/lib/actions/admin.ts`
 
-- [ ] Task 6: Add Result type to shared types (AC: #5)
-  - [ ] Add to `src/types/index.ts`:
+- [x] Task 6: Add Result type to shared types (AC: #5)
+  - [x] Add to `src/types/index.ts`:
     ```typescript
     export type Result = {
       id: number;
@@ -251,10 +251,38 @@ Scores are NOT recalculated inside `enterResult()`. Instead:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation followed story spec exactly with no blockers.
+
 ### Completion Notes List
 
+- Added `results` table to schema with unique constraint on `matchId` (dual-storage: results table + matches.winner denormalized column)
+- Migration `0004_superb_silver_centurion.sql` generated and applied to Turso DB
+- `enterResult()` server action: admin auth, match validation, winner validation, upsert pattern (supports Story 5.2 correction flow out of the box), revalidates `/admin`, `/leaderboard`, and `/bracket`
+- `advanceWinner()` private helper: positions odd → teamA slot, even → teamB slot, no-op at round 5 (Final)
+- `AdminMatchCard` three-state client component: unresolved (bolder border + "No result" badge), pending confirm (Emerald 50 highlight + confirm/cancel buttons), resolved (Emerald 100 winner highlight + "Result saved" indicator)
+- Correction-mode fix: winner highlight suppressed when a new team is selected on a resolved card — only the newly selected team is highlighted
+- `ResultsManager` manages optimistic local state after confirm — no page reload required to see resolved state
+- Admin page fetches matches, config, and results in parallel; passes to ResultsManager
+- Code review fixes applied: added `revalidatePath("/bracket")`, fixed dual-highlight in correction mode, added "No result" badge, added 27 unit tests for AdminMatchCard and ResultsManager
+- 238/238 tests pass
+
 ### File List
+
+- `worldcup-app/src/db/schema.ts` — added `results` table
+- `worldcup-app/src/db/migrations/0004_superb_silver_centurion.sql` — migration for results table
+- `worldcup-app/src/db/migrations/meta/_journal.json` — updated by drizzle-kit generate
+- `worldcup-app/src/types/index.ts` — added `Result` type
+- `worldcup-app/src/lib/actions/admin.ts` — added `getResults()`, `enterResult()`, `advanceWinner()`; added `revalidatePath("/bracket")`
+- `worldcup-app/src/components/admin/AdminMatchCard.tsx` — new component; fixed correction-mode dual-highlight; added "No result" badge
+- `worldcup-app/src/components/admin/AdminMatchCard.test.tsx` — new test file (16 tests)
+- `worldcup-app/src/components/admin/ResultsManager.tsx` — new component
+- `worldcup-app/src/components/admin/ResultsManager.test.tsx` — new test file (11 tests)
+- `worldcup-app/src/app/(app)/admin/page.tsx` — added Match Results section
+
+### Change Log
+
+- 2026-02-21: Implemented Story 5.1 — Admin Result Entry. Added results table, enterResult server action with winner advancement, AdminMatchCard and ResultsManager components, Match Results section on admin page.

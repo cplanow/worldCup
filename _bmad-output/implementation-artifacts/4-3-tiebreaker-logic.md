@@ -1,6 +1,6 @@
 # Story 4.3: Tiebreaker Logic
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -29,26 +29,26 @@ so that rankings are definitive even when participants have equal scores.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement tiebreaker sorting (AC: #1, #2)
-  - [ ] Add to `src/lib/scoring-engine.ts`:
-  - [ ] `applyTiebreakers(entries: LeaderboardEntry[], params: TiebreakerInput): LeaderboardEntry[]`
+- [x] Task 1: Implement tiebreaker sorting (AC: #1, #2)
+  - [x] Add to `src/lib/scoring-engine.ts`:
+  - [x] `applyTiebreakers(entries: LeaderboardEntry[], params: TiebreakerInput): LeaderboardEntry[]`
     - Sort entries by:
       1. Score (descending) — primary sort
       2. Correct champion pick (true ranks higher) — first tiebreaker
       3. Correct picks in latest completed round (more = higher) — second tiebreaker
     - Assign `rank` values (1, 2, 3, ...) — tied participants after all tiebreakers share the same rank
-  - [ ] `getCorrectPicksInRound(params: { picks: { matchId: number; selectedTeam: string }[]; results: { matchId: number; winner: string }[]; matches: { id: number; round: number }[]; targetRound: number }): number`
+  - [x] `getCorrectPicksInRound(params: { picks: { matchId: number; selectedTeam: string }[]; results: { matchId: number; winner: string }[]; matches: { id: number; round: number }[]; targetRound: number }): number`
     - Count how many correct picks a user has in a specific round
-  - [ ] `getLatestCompletedRound(results: { matchId: number }[], matches: { id: number; round: number }[]): number`
+  - [x] `getLatestCompletedRound(results: { matchId: number }[], matches: { id: number; round: number }[]): number`
     - Find the highest round number where ALL matches in that round have results
     - If no round is fully complete, use the highest round that has ANY results
 
-- [ ] Task 2: Integrate tiebreakers into buildLeaderboardEntries (AC: #1, #2)
-  - [ ] Update `buildLeaderboardEntries()` from Story 4.2 to call `applyTiebreakers()` as the final step
-  - [ ] Pass necessary data for tiebreaker computation (champion pick correctness, per-round correct counts)
+- [x] Task 2: Integrate tiebreakers into buildLeaderboardEntries (AC: #1, #2)
+  - [x] Update `buildLeaderboardEntries()` from Story 4.2 to call `applyTiebreakers()` as the final step
+  - [x] Pass necessary data for tiebreaker computation (champion pick correctness, per-round correct counts)
 
-- [ ] Task 3: Write unit tests (AC: #3)
-  - [ ] Add tests to `src/lib/scoring-engine.test.ts`:
+- [x] Task 3: Write unit tests (AC: #3)
+  - [x] Add tests to `src/lib/scoring-engine.test.ts`:
     - **No tie:** Users with different scores → ranked by score
     - **Tie broken by champion pick:** Two users same score, one has correct champion → that user ranks higher
     - **Tie broken by latest-round picks:** Two users same score, neither has correct champion, one has more correct picks in latest round → ranks higher
@@ -114,21 +114,30 @@ export function applyTiebreakers(
     return 0;
   });
 
-  // Assign ranks (tied entries share same rank)
-  let currentRank = 1;
+  // Assign ranks — truly tied entries (same score + same tiebreaker values) share the same rank
   sorted[0].rank = 1;
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1];
     const curr = sorted[i];
-    // If same score and same tiebreaker values, share rank
-    if (curr.score === prev.score) {
-      // Check if tiebreakers also match
-      const sameChamp = curr.championPick === prev.championPick;
-      // For simplicity, if sort didn't differentiate them, they share rank
-      curr.rank = prev.rank;
-    } else {
-      curr.rank = i + 1;
+
+    if (curr.score !== prev.score) { curr.rank = i + 1; continue; }
+
+    // Champion tiebreaker: both correct or both incorrect → still tied
+    let champTied = true;
+    if (actualChampion) {
+      champTied = (curr.championPick === actualChampion) === (prev.championPick === actualChampion);
     }
+    if (!champTied) { curr.rank = i + 1; continue; }
+
+    // Latest-round tiebreaker: same correct picks in latest round → still tied
+    let roundTied = true;
+    if (latestRound > 0) {
+      const prevRoundPicks = getCorrectPicksInRound({ picks: input.allPicks.filter(p => p.userId === prev.userId), results: input.results, matches: input.matches, targetRound: latestRound });
+      const currRoundPicks = getCorrectPicksInRound({ picks: input.allPicks.filter(p => p.userId === curr.userId), results: input.results, matches: input.matches, targetRound: latestRound });
+      roundTied = prevRoundPicks === currRoundPicks;
+    }
+
+    curr.rank = roundTied ? prev.rank : i + 1;
   }
 
   return sorted;
@@ -160,13 +169,18 @@ export function getLatestCompletedRound(
 ): number {
   const resultMatchIds = new Set(results.map(r => r.matchId));
 
-  // Check rounds from highest to lowest
+  // First pass: find highest round where ALL matches have results (fully completed)
   for (let round = 5; round >= 1; round--) {
     const roundMatches = matches.filter(m => m.round === round);
     if (roundMatches.length === 0) continue;
+    if (roundMatches.every(m => resultMatchIds.has(m.id))) return round;
+  }
 
-    const hasAnyResult = roundMatches.some(m => resultMatchIds.has(m.id));
-    if (hasAnyResult) return round;
+  // Fallback: find highest round with any results (partially in progress)
+  for (let round = 5; round >= 1; round--) {
+    const roundMatches = matches.filter(m => m.round === round);
+    if (roundMatches.length === 0) continue;
+    if (roundMatches.some(m => resultMatchIds.has(m.id))) return round;
   }
 
   return 0; // No results entered
@@ -226,10 +240,34 @@ After the Final, a correct champion pick is the strongest tiebreaker — per PRD
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation was straightforward.
+
 ### Completion Notes List
 
+- Implemented three pure functions in `src/lib/scoring-engine.ts`:
+  - `getLatestCompletedRound`: returns highest fully-completed round; falls back to highest round with any results; returns 0 if no results
+  - `getCorrectPicksInRound`: counts a user's correct picks in a specific round
+  - `applyTiebreakers`: sorts entries by score → champion correctness → latest-round picks; assigns shared ranks for truly tied entries
+- Updated `buildLeaderboardEntries` to delegate sort + rank assignment to `applyTiebreakers` (removed old alphabetical-tiebreak sort)
+- Updated existing test `"assigns sequential ranks to tied users with alphabetical tiebreak"` → now `"assigns same rank to truly tied users"` to reflect new shared-rank behavior
+- All 6 required tiebreaker test scenarios implemented; 211/211 tests pass
+
+### Code Review Fixes (2026-02-21)
+
+- **M1 fix:** `getLatestCompletedRound` updated to use "all results first, fallback to any" strategy, aligning with task spec and AC2 ("latest completed round"). Added two-pass approach: first pass checks `every()`, fallback checks `some()`.
+- **M2 fix:** Dev Notes rank assignment pseudocode updated to match actual implementation (removed stale `currentRank`/`sameChamp` variables, added correct champion + round-picks tie checks).
+- **M3 fix:** Added test `"prefers fully-completed lower round over partially-completed higher round"` to `getLatestCompletedRound` suite.
+
 ### File List
+
+- `worldcup-app/src/lib/scoring-engine.ts` — modified
+- `worldcup-app/src/lib/scoring-engine.test.ts` — modified
+
+### Change Log
+
+- Added `getLatestCompletedRound`, `getCorrectPicksInRound`, `applyTiebreakers` to scoring engine (Date: 2026-02-21)
+- Updated `buildLeaderboardEntries` to use tiebreaker-aware sorting with shared-rank assignment (Date: 2026-02-21)
