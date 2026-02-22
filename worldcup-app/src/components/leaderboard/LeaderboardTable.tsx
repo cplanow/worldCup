@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { LeaderboardEntry } from "@/types";
 import {
   Table,
@@ -16,6 +17,23 @@ interface LeaderboardTableProps {
 }
 
 export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableProps) {
+  const router = useRouter();
+
+  const handleRowClick = (username: string) => {
+    if (username === currentUsername) {
+      router.push("/bracket");
+    } else {
+      router.push(`/bracket/${encodeURIComponent(username)}`);
+    }
+  };
+
+  const handleRowKeyDown = (e: React.KeyboardEvent, username: string) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleRowClick(username);
+    }
+  };
+
   return (
     <div className="overflow-x-auto">
     <Table>
@@ -44,10 +62,14 @@ export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableP
           return (
             <TableRow
               key={entry.userId}
+              role="link"
+              tabIndex={0}
+              onClick={() => handleRowClick(entry.username)}
+              onKeyDown={(e) => handleRowKeyDown(e, entry.username)}
               className={
                 isCurrentUser
-                  ? "bg-emerald-50 hover:bg-emerald-50"
-                  : undefined
+                  ? "bg-emerald-50 hover:bg-emerald-50 cursor-pointer"
+                  : "cursor-pointer hover:bg-slate-50"
               }
             >
               <TableCell className="text-center font-semibold px-4 py-3">

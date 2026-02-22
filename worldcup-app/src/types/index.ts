@@ -60,7 +60,9 @@ export type Result = {
   createdAt: string;
 };
 
-export type MatchCardMode = "entry" | "readonly";
+export type MatchCardMode = "entry" | "readonly" | "results";
+
+export type PickClassification = "correct" | "wrong" | "pending";
 
 export interface MaxPointsInput {
   picks: { matchId: number; selectedTeam: string }[];

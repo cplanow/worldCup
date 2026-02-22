@@ -7,6 +7,8 @@ import {
   getCascadingClears,
   validatePick,
   getAvailableMatches,
+  classifyPick,
+  classifyAllPicks,
   ROUND_NAMES,
   MATCHES_PER_ROUND,
   MAX_PICKS,
@@ -347,6 +349,90 @@ describe("validatePick", () => {
       makePick({ id: 10, matchId: 1, selectedTeam: "Brazil" }),
     ];
     expect(validatePick(17, "Brazil", allMatches, picks)).toBe(false);
+  });
+});
+
+describe("classifyPick", () => {
+  it("returns 'pending' when no result exists", () => {
+    expect(classifyPick({ selectedTeam: "Brazil" }, null)).toBe("pending");
+  });
+
+  it("returns 'correct' when pick matches result winner", () => {
+    expect(classifyPick({ selectedTeam: "Brazil" }, { winner: "Brazil" })).toBe("correct");
+  });
+
+  it("returns 'wrong' when pick does not match result winner", () => {
+    expect(classifyPick({ selectedTeam: "Mexico" }, { winner: "Brazil" })).toBe("wrong");
+  });
+});
+
+describe("classifyAllPicks", () => {
+  const classifyMatches: Match[] = [
+    makeMatch({ id: 1, round: 1, position: 1, teamA: "Brazil", teamB: "Mexico" }),
+    makeMatch({ id: 2, round: 1, position: 2, teamA: "France", teamB: "Spain" }),
+    makeMatch({ id: 17, round: 2, position: 1, teamA: "", teamB: "" }),
+  ];
+
+  it("returns 'pending' for picks with no result", () => {
+    const picks = [{ matchId: 1, selectedTeam: "Brazil" }];
+    const map = classifyAllPicks(picks, [], classifyMatches);
+    expect(map.get(1)).toBe("pending");
+  });
+
+  it("returns 'correct' when pick matches result", () => {
+    const picks = [{ matchId: 1, selectedTeam: "Brazil" }];
+    const results = [{ matchId: 1, winner: "Brazil" }];
+    const map = classifyAllPicks(picks, results, classifyMatches);
+    expect(map.get(1)).toBe("correct");
+  });
+
+  it("returns 'wrong' when pick does not match result", () => {
+    const picks = [{ matchId: 1, selectedTeam: "Mexico" }];
+    const results = [{ matchId: 1, winner: "Brazil" }];
+    const map = classifyAllPicks(picks, results, classifyMatches);
+    expect(map.get(1)).toBe("wrong");
+  });
+
+  it("marks downstream picks 'wrong' when picked team is eliminated (cascading)", () => {
+    const picks = [
+      { matchId: 1, selectedTeam: "Brazil" },   // Brazil loses → wrong
+      { matchId: 17, selectedTeam: "Brazil" },  // cascading wrong (Brazil eliminated)
+    ];
+    const results = [{ matchId: 1, winner: "Mexico" }];
+    const map = classifyAllPicks(picks, results, classifyMatches);
+    expect(map.get(1)).toBe("wrong");
+    expect(map.get(17)).toBe("wrong");
+  });
+
+  it("returns 'pending' for downstream picks when picked team is still alive", () => {
+    const picks = [
+      { matchId: 1, selectedTeam: "Brazil" },
+      { matchId: 17, selectedTeam: "Brazil" },
+    ];
+    const map = classifyAllPicks(picks, [], classifyMatches);
+    expect(map.get(17)).toBe("pending");
+  });
+
+  it("does not include matchIds not in picks", () => {
+    const picks = [{ matchId: 1, selectedTeam: "Brazil" }];
+    const map = classifyAllPicks(picks, [], classifyMatches);
+    expect(map.has(17)).toBe(false);
+  });
+
+  it("handles mixed correct, wrong, pending picks", () => {
+    const picks = [
+      { matchId: 1, selectedTeam: "Brazil" },   // wrong (Mexico wins)
+      { matchId: 2, selectedTeam: "France" },   // correct (France wins)
+      { matchId: 17, selectedTeam: "Brazil" },  // cascading wrong
+    ];
+    const results = [
+      { matchId: 1, winner: "Mexico" },
+      { matchId: 2, winner: "France" },
+    ];
+    const map = classifyAllPicks(picks, results, classifyMatches);
+    expect(map.get(1)).toBe("wrong");
+    expect(map.get(2)).toBe("correct");
+    expect(map.get(17)).toBe("wrong");
   });
 });
 

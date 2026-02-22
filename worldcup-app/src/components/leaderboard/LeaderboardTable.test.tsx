@@ -1,7 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { LeaderboardTable } from "./LeaderboardTable";
 import type { LeaderboardEntry } from "@/types";
+
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
 
 function makeEntry(
   userId: number,
@@ -30,6 +35,10 @@ const ENTRIES: LeaderboardEntry[] = [
 ];
 
 describe("LeaderboardTable", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders a row for every entry", () => {
     render(<LeaderboardTable entries={ENTRIES} currentUsername="carol" />);
     expect(screen.getByText("alice")).toBeTruthy();
@@ -131,5 +140,47 @@ describe("LeaderboardTable", () => {
     expect(screen.getByText("30")).toBeTruthy();
     expect(screen.getByText("20")).toBeTruthy();
     expect(screen.getByText("10")).toBeTruthy();
+  });
+
+  it("clicking another user's row navigates to /bracket/[username]", () => {
+    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
+    const bobRow = screen.getByText("bob").closest("tr");
+    fireEvent.click(bobRow!);
+    expect(mockPush).toHaveBeenCalledWith("/bracket/bob");
+  });
+
+  it("clicking current user's row navigates to /bracket (own bracket)", () => {
+    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
+    const aliceRow = screen.getByText("alice").closest("tr");
+    fireEvent.click(aliceRow!);
+    expect(mockPush).toHaveBeenCalledWith("/bracket");
+  });
+
+  it("pressing Enter on a row triggers navigation", () => {
+    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
+    const bobRow = screen.getByText("bob").closest("tr");
+    fireEvent.keyDown(bobRow!, { key: "Enter" });
+    expect(mockPush).toHaveBeenCalledWith("/bracket/bob");
+  });
+
+  it("pressing Space on a row triggers navigation", () => {
+    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
+    const bobRow = screen.getByText("bob").closest("tr");
+    fireEvent.keyDown(bobRow!, { key: " " });
+    expect(mockPush).toHaveBeenCalledWith("/bracket/bob");
+  });
+
+  it("rows have cursor-pointer class for clickability", () => {
+    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
+    const bobRow = screen.getByText("bob").closest("tr");
+    expect(bobRow?.className).toContain("cursor-pointer");
+  });
+
+  it("encodes special characters in username for URL", () => {
+    const specialEntry = makeEntry(4, "user name", 5, 4);
+    render(<LeaderboardTable entries={[specialEntry]} currentUsername="alice" />);
+    const row = screen.getByText("user name").closest("tr");
+    fireEvent.click(row!);
+    expect(mockPush).toHaveBeenCalledWith("/bracket/user%20name");
   });
 });

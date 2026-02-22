@@ -7,6 +7,7 @@ import { matches, tournamentConfig, results } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import type { TournamentConfig, Result } from "@/types";
+import { ROUND_NAMES, MATCHES_PER_ROUND } from "@/lib/bracket-utils";
 
 async function verifyAdmin(): Promise<boolean> {
   const cookieStore = await cookies();
@@ -158,13 +159,6 @@ export async function checkBracketLock(): Promise<boolean> {
   return config.isLocked;
 }
 
-const MATCHES_PER_ROUND: Record<number, number> = {
-  2: 8,
-  3: 4,
-  4: 2,
-  5: 1,
-};
-
 export async function initializeBracketStructure(): Promise<
   ActionResult<{ created: number }>
 > {
@@ -280,6 +274,84 @@ export async function enterResult(data: {
   revalidatePath("/bracket");
 
   return { success: true, data: null };
+}
+
+export async function correctResult(data: {
+  matchId: number;
+  winner: string;
+}): Promise<ActionResult<{ warning?: string }>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const existingResult = await db
+    .select()
+    .from(results)
+    .where(eq(results.matchId, data.matchId))
+    .get();
+
+  if (!existingResult) {
+    return {
+      success: false,
+      error: "No existing result to correct. Use enter result instead.",
+    };
+  }
+
+  const match = await db
+    .select()
+    .from(matches)
+    .where(eq(matches.id, data.matchId))
+    .get();
+
+  if (!match) return { success: false, error: "Match not found" };
+
+  if (!match.teamA || !match.teamB) {
+    return { success: false, error: "Match teams are not yet determined" };
+  }
+
+  if (data.winner !== match.teamA && data.winner !== match.teamB) {
+    return { success: false, error: "Winner must be one of the teams" };
+  }
+
+  await db
+    .update(results)
+    .set({ winner: data.winner })
+    .where(eq(results.id, existingResult.id));
+
+  await db
+    .update(matches)
+    .set({ winner: data.winner })
+    .where(eq(matches.id, data.matchId));
+
+  await advanceWinner(match.round, match.position, data.winner);
+
+  let warning: string | undefined;
+  if (match.round < 5) {
+    const nextRound = match.round + 1;
+    const nextPosition = Math.ceil(match.position / 2);
+    const nextMatch = await db
+      .select()
+      .from(matches)
+      .where(and(eq(matches.round, nextRound), eq(matches.position, nextPosition)))
+      .get();
+    if (nextMatch) {
+      const nextResult = await db
+        .select()
+        .from(results)
+        .where(eq(results.matchId, nextMatch.id))
+        .get();
+      if (nextResult) {
+        const roundName = ROUND_NAMES[nextRound] ?? `Round ${nextRound}`;
+        warning = `Result updated. Please verify ${roundName} results — the advancing team has changed.`;
+      }
+    }
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  revalidatePath("/bracket");
+
+  return { success: true, data: { warning } };
 }
 
 async function advanceWinner(round: number, position: number, winner: string) {

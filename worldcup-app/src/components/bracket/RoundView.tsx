@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { MatchCard } from "./MatchCard";
-import type { BracketState, MatchCardMode } from "@/types";
+import type { BracketState, MatchCardMode, PickClassification } from "@/types";
 
 interface RoundViewProps {
   bracketState: BracketState;
   onSelect: (matchId: number, team: string) => void;
   disabled: boolean;
   mode: MatchCardMode;
+  classifications?: Map<number, PickClassification>;
   progressBar?: React.ReactNode;
   submitSection?: React.ReactNode;
 }
 
-export function RoundView({ bracketState, onSelect, disabled, mode, progressBar, submitSection }: RoundViewProps) {
+export function RoundView({ bracketState, onSelect, disabled, mode, classifications, progressBar, submitSection }: RoundViewProps) {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const round = bracketState.rounds[currentRoundIndex];
   const isFirst = currentRoundIndex === 0;
@@ -86,6 +87,7 @@ export function RoundView({ bracketState, onSelect, disabled, mode, progressBar,
             selectedTeam={slot.selectedTeam}
             disabled={disabled || !slot.teamA || !slot.teamB}
             mode={mode}
+            classification={classifications?.get(slot.matchId)}
             onSelect={onSelect}
           />
         ))}

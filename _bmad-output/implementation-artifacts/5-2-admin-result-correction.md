@@ -1,6 +1,6 @@
 # Story 5.2: Admin Result Correction
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -34,9 +34,9 @@ so that any mistakes are fixed and all scores recalculate accurately.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement correctResult Server Action (AC: #2, #4)
-  - [ ] Add to `src/lib/actions/admin.ts`:
-  - [ ] `correctResult(data: { matchId: number; winner: string }): Promise<ActionResult<null>>`
+- [x] Task 1: Implement correctResult Server Action (AC: #2, #4)
+  - [x] Add to `src/lib/actions/admin.ts`:
+  - [x] `correctResult(data: { matchId: number; winner: string }): Promise<ActionResult<{ warning?: string }>>`
     - Verify admin identity
     - Validate match exists and has an existing result
     - Validate new winner is one of the teams
@@ -44,30 +44,30 @@ so that any mistakes are fixed and all scores recalculate accurately.
     - Update `matches.winner` column
     - Handle cascading team advancement correction (see below)
     - Return success
-  - [ ] OR: reuse `enterResult()` from Story 5.1 if it already handles upsert (it does). In that case, `correctResult` may just be an alias or the same function with an extra validation that a result already exists.
+  - [x] OR: reuse `enterResult()` from Story 5.1 if it already handles upsert (it does). In that case, `correctResult` may just be an alias or the same function with an extra validation that a result already exists.
 
-- [ ] Task 2: Handle cascading advancement correction (AC: #2)
-  - [ ] When a result is corrected, the advancing team changes:
+- [x] Task 2: Handle cascading advancement correction (AC: #2)
+  - [x] When a result is corrected, the advancing team changes:
     - Update the team slot in the next-round match
     - If the next-round match ALSO has a result involving the old team, that result may now be invalid
     - **Decision:** For MVP, correcting an R32 result updates the R16 team slot. If the R16 match already has a result and the OLD winner was involved, flag it for the admin but don't auto-clear (admin manually re-enters later results).
     - Show a warning after correction if downstream results may be affected: "Note: This correction may affect results in later rounds. Please verify Round of 16 results."
-  - [ ] Update `advanceWinner()` from Story 5.1 to handle the correction case
+  - [x] Update `advanceWinner()` from Story 5.1 to handle the correction case
 
-- [ ] Task 3: Update AdminMatchCard for correction flow (AC: #1)
-  - [ ] Update `src/components/admin/AdminMatchCard.tsx`:
-  - [ ] Resolved matches are tappable — tapping re-opens the selection flow
-  - [ ] When a resolved match is tapped:
+- [x] Task 3: Update AdminMatchCard for correction flow (AC: #1)
+  - [x] Update `src/components/admin/AdminMatchCard.tsx`:
+  - [x] Resolved matches are tappable — tapping re-opens the selection flow
+  - [x] When a resolved match is tapped:
     - Clear the selection state (both teams return to neutral)
     - Show team options for re-selection
     - Confirm/cancel buttons appear (same as initial entry)
-  - [ ] Visual indicator that this is a correction: subtle "Correcting..." label or different button text "Update Result"
+  - [x] Visual indicator that this is a correction: different button text "Update Result"
 
-- [ ] Task 4: Update ResultsManager for correction UX (AC: #1, #3)
-  - [ ] Update `src/components/admin/ResultsManager.tsx`:
-  - [ ] After correction success, show brief inline feedback: "Result updated"
-  - [ ] If downstream results may be affected, show warning message
-  - [ ] Refresh match data after correction (revalidate page or update local state)
+- [x] Task 4: Update ResultsManager for correction UX (AC: #1, #3)
+  - [x] Update `src/components/admin/ResultsManager.tsx`:
+  - [x] After correction success, show brief inline feedback: "Result updated"
+  - [x] If downstream results may be affected, show warning message
+  - [x] Refresh match data after correction (revalidate page or update local state)
 
 ## Dev Notes
 
@@ -163,12 +163,12 @@ Full automatic cascade correction (clearing all downstream results when an earli
 
 ### Testing Considerations
 
-- [ ] Tap a resolved match → re-enters selection flow
-- [ ] Select different winner → confirm → result updated
-- [ ] Leaderboard shows corrected scores on next load
-- [ ] Advancing team updated in next round's match slot
-- [ ] Warning shown if downstream results may be affected
-- [ ] Cancel during correction → original result preserved
+- [x] Tap a resolved match → re-enters selection flow
+- [x] Select different winner → confirm → result updated
+- [x] Leaderboard shows corrected scores on next load
+- [x] Advancing team updated in next round's match slot
+- [x] Warning shown if downstream results may be affected
+- [x] Cancel during correction → original result preserved
 
 ### References
 
@@ -180,10 +180,32 @@ Full automatic cascade correction (clearing all downstream results when an earli
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation was straightforward following the Dev Notes pseudocode.
+
 ### Completion Notes List
 
+- **Task 1 & 2:** Added `correctResult()` to `worldcup-app/src/lib/actions/admin.ts`. The function validates an existing result, updates both `results` and `matches` tables, calls the existing `advanceWinner()` to update the next-round team slot, then checks if the next round already has a result and returns a typed warning string if so. `ROUND_NAMES` constant added to admin.ts to generate human-readable round names in warning messages. `revalidatePath` called for `/admin`, `/leaderboard`, and `/bracket`.
+- **Task 3:** `AdminMatchCard.tsx` already had the correction UX from Story 5.1 (resolved matches tappable, winner highlight suppressed during selection). Updated the confirm button text to show "Update Result" when `isResolved` (correction mode) vs "Confirm Result" (initial entry). Updated the existing correction-mode test to match.
+- **Task 4:** Updated `ResultsManager.tsx` to call `correctResult` (imported from admin actions) when a result already exists for the match, and `enterResult` for initial entry. Added `successMsg` and `warning` state variables. Shows emerald "Result updated" banner after successful correction and amber warning banner when `correctResult` returns a downstream warning. Added 5 new component tests covering all correction paths.
+- **Tests:** 7 new unit tests for `correctResult` in `admin.test.ts`, 1 updated + 5 new tests in `ResultsManager.test.tsx`, 1 updated test in `AdminMatchCard.test.tsx`. All 270 tests pass with zero regressions.
+
 ### File List
+
+- `worldcup-app/src/lib/actions/admin.ts` (modified)
+- `worldcup-app/src/lib/actions/admin.test.ts` (modified)
+- `worldcup-app/src/components/admin/AdminMatchCard.tsx` (modified)
+- `worldcup-app/src/components/admin/AdminMatchCard.test.tsx` (modified)
+- `worldcup-app/src/components/admin/ResultsManager.tsx` (modified)
+- `worldcup-app/src/components/admin/ResultsManager.test.tsx` (modified)
+- `worldcup-app/src/lib/bracket-utils.ts` (import source — ROUND_NAMES/MATCHES_PER_ROUND now exported from here)
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-02-22 | Implemented Story 5.2: `correctResult()` server action with downstream warning, AdminMatchCard "Update Result" button text, ResultsManager correction UX with success and warning banners |
+| 2026-02-22 | Code review fixes: added 7 `enterResult` unit tests (H1), deduplicated ROUND_NAMES/MATCHES_PER_ROUND to bracket-utils.ts (M1), added same-winner no-op test for `correctResult` (M2), added success banner for initial `enterResult` (M3), added teams-not-set guard in `correctResult` (L1), AdminMatchCard skips server call on same-winner re-confirm (L2) |

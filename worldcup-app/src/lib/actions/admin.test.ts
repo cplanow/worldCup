@@ -68,6 +68,12 @@ vi.mock("@/db/schema", () => ({
     pointsFinal: "points_final",
     createdAt: "created_at",
   },
+  results: {
+    id: "id",
+    matchId: "match_id",
+    winner: "winner",
+    createdAt: "created_at",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -76,7 +82,7 @@ vi.mock("drizzle-orm", () => ({
   asc: vi.fn((col) => ({ type: "asc", col })),
 }));
 
-import { setupMatchup, getMatches, deleteMatchup, getTournamentConfig, toggleLock, checkBracketLock, initializeBracketStructure } from "./admin";
+import { setupMatchup, getMatches, deleteMatchup, getTournamentConfig, toggleLock, checkBracketLock, initializeBracketStructure, enterResult, correctResult } from "./admin";
 import { cookies } from "next/headers";
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -406,5 +412,183 @@ describe("initializeBracketStructure", () => {
         expect.objectContaining({ round: 5, position: 1, teamA: "", teamB: "" }),
       ])
     );
+  });
+});
+
+describe("correctResult", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin users", async () => {
+    mockNonAdmin();
+    const result = await correctResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("returns error when no existing result found", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // no existing result
+    const result = await correctResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({
+      success: false,
+      error: "No existing result to correct. Use enter result instead.",
+    });
+  });
+
+  it("returns error when match not found", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce(undefined); // match not found
+    const result = await correctResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Match not found" });
+  });
+
+  it("returns error when winner is not one of the teams", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    const result = await correctResult({ matchId: 1, winner: "Argentina" });
+    expect(result).toEqual({ success: false, error: "Winner must be one of the teams" });
+  });
+
+  it("successfully corrects result with no downstream warning when next round has no result", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "", teamB: "", round: 2, position: 1 }); // advanceWinner nextMatch
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "", teamB: "", round: 2, position: 1 }); // downstream nextMatch
+    mockGet.mockResolvedValueOnce(undefined); // no downstream result
+
+    const result = await correctResult({ matchId: 1, winner: "Mexico" });
+    expect(result).toEqual({ success: true, data: { warning: undefined } });
+    expect(mockSet).toHaveBeenCalledWith({ winner: "Mexico" });
+  });
+
+  it("returns warning message when downstream round already has a result", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "Brazil", teamB: "France", round: 2, position: 1 }); // advanceWinner nextMatch
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "Brazil", teamB: "France", round: 2, position: 1 }); // downstream nextMatch
+    mockGet.mockResolvedValueOnce({ id: 2, matchId: 17, winner: "Brazil" }); // downstream result exists
+
+    const result = await correctResult({ matchId: 1, winner: "Mexico" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.warning).toContain("Round of 16");
+    }
+  });
+
+  it("skips downstream check when correcting the Final (round 5)", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 5, matchId: 5, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce({ id: 5, teamA: "Brazil", teamB: "Mexico", round: 5, position: 1 }); // final match
+
+    const result = await correctResult({ matchId: 5, winner: "Mexico" });
+    expect(result).toEqual({ success: true, data: { warning: undefined } });
+  });
+
+  it("returns error when match teams are not yet determined", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "", teamB: "", round: 2, position: 1 }); // match with no teams
+    const result = await correctResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Match teams are not yet determined" });
+  });
+
+  it("succeeds when re-confirming the same winner (no-op correction)", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "Brazil", teamB: "", round: 2, position: 1 }); // advanceWinner nextMatch
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "Brazil", teamB: "", round: 2, position: 1 }); // downstream nextMatch
+    mockGet.mockResolvedValueOnce(undefined); // no downstream result
+
+    const result = await correctResult({ matchId: 1, winner: "Brazil" }); // same winner
+    expect(result).toEqual({ success: true, data: { warning: undefined } });
+    expect(mockSet).toHaveBeenCalledWith({ winner: "Brazil" }); // still updates (server is source of truth)
+  });
+});
+
+describe("enterResult", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin users", async () => {
+    mockNonAdmin();
+    const result = await enterResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("returns error when match not found", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // match not found
+    const result = await enterResult({ matchId: 99, winner: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Match not found" });
+  });
+
+  it("returns error when match teams are not yet determined", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "", teamB: "", round: 2, position: 1 }); // placeholder match
+    const result = await enterResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Match teams are not yet determined" });
+  });
+
+  it("returns error when winner is not one of the teams", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 });
+    const result = await enterResult({ matchId: 1, winner: "Argentina" });
+    expect(result).toEqual({ success: false, error: "Winner must be one of the teams in this match" });
+  });
+
+  it("inserts new result when no existing result", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    mockGet.mockResolvedValueOnce(undefined); // no existing result
+    mockGet.mockResolvedValueOnce(null);       // advanceWinner: no next match (round 1, skip)
+
+    const result = await enterResult({ matchId: 1, winner: "Brazil" });
+    expect(result).toEqual({ success: true, data: null });
+    expect(mockSet).toHaveBeenCalledWith({ winner: "Brazil" }); // matches.winner updated
+  });
+
+  it("updates existing result on re-entry (upsert path)", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    mockGet.mockResolvedValueOnce({ id: 5, matchId: 1, winner: "Brazil" }); // existing result
+    mockGet.mockResolvedValueOnce(null); // advanceWinner: no next match
+
+    const result = await enterResult({ matchId: 1, winner: "Mexico" });
+    expect(result).toEqual({ success: true, data: null });
+    expect(mockSet).toHaveBeenCalledWith({ winner: "Mexico" });
+  });
+
+  it("advances winner to next-round match slot", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 1, teamA: "Brazil", teamB: "Mexico", round: 1, position: 1 }); // match
+    mockGet.mockResolvedValueOnce(undefined); // no existing result
+    mockGet.mockResolvedValueOnce({ id: 17, teamA: "", teamB: "", round: 2, position: 1 }); // next round match
+
+    await enterResult({ matchId: 1, winner: "Brazil" });
+    // Position 1 (odd) → teamA slot of next match
+    expect(mockSet).toHaveBeenCalledWith({ teamA: "Brazil" });
   });
 });

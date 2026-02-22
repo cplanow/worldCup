@@ -1,6 +1,6 @@
 # Story 5.3: Color-Coded Bracket Results
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,50 +39,50 @@ so that I can instantly see which picks were correct, wrong, or still pending.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Update MatchCard results mode styling (AC: #1, #2, #3, #5)
-  - [ ] Update `src/components/bracket/MatchCard.tsx`:
-  - [ ] Add `mode="results"` handling (extends the `mode` prop from Story 3.4):
+- [x] Task 1: Update MatchCard results mode styling (AC: #1, #2, #3, #5)
+  - [x] Update `src/components/bracket/MatchCard.tsx`:
+  - [x] Add `mode="results"` handling (extends the `mode` prop from Story 3.4):
     - **Correct pick:** Emerald 500 (`#10B981`) background on selected team row, white text, checkmark icon (✓)
     - **Wrong pick:** Red 500 (`#EF4444`) background on selected team row, white text, X icon (✗), team name with line-through
     - **Pending (no result):** Slate 300 (`#CBD5E1`) background on selected team row, Slate 600 text, no icon
     - **Unselected team in resolved match:** neutral white background
-  - [ ] Props addition: `result: { winner: string } | null` — when provided with `mode="results"`, determines correct/wrong styling
-  - [ ] Accessibility: checkmark (✓) and X (✗) symbols are the PRIMARY indicator alongside color. Use `aria-label` on each team row: "[Team] — correct pick" or "[Team] — wrong pick" or "[Team] — pending"
+  - [x] Props addition: `classification?: PickClassification` — passed from BracketView via BracketTree/RoundView
+  - [x] Accessibility: checkmark (✓) and X (✗) symbols are the PRIMARY indicator alongside color. Use `aria-label` on each team row: "[Team] — correct pick" or "[Team] — wrong pick" or "[Team] — pending"
 
-- [ ] Task 2: Implement pick result classification (AC: #1, #2, #3, #4)
-  - [ ] Add to `src/lib/bracket-utils.ts`:
-  - [ ] `classifyPick(pick: { selectedTeam: string }, result: { winner: string } | null): "correct" | "wrong" | "pending"`
+- [x] Task 2: Implement pick result classification (AC: #1, #2, #3, #4)
+  - [x] Add to `src/lib/bracket-utils.ts`:
+  - [x] `classifyPick(pick: { selectedTeam: string }, result: { winner: string } | null): "correct" | "wrong" | "pending"`
     - If no result: "pending"
     - If pick.selectedTeam === result.winner: "correct"
     - Else: "wrong"
-  - [ ] `classifyAllPicks(picks: Pick[], results: Result[], matches: Match[]): Map<number, "correct" | "wrong" | "pending">`
+  - [x] `classifyAllPicks(picks: Pick[], results: Result[], matches: Match[]): Map<number, "correct" | "wrong" | "pending">`
     - For each pick, find the result for that match, classify
     - Returns map of matchId → classification
-  - [ ] Cascading wrong detection: a pick is "wrong" if either:
+  - [x] Cascading wrong detection: a pick is "wrong" if either:
     - The match has a result and the pick doesn't match, OR
     - The picked team was eliminated in an earlier round (team lost a match in a previous round per actual results)
-  - [ ] For cascading: if a team is eliminated, ALL downstream picks of that team are "wrong" regardless of whether those matches have results yet
+  - [x] For cascading: if a team is eliminated, ALL downstream picks of that team are "wrong" regardless of whether those matches have results yet
 
-- [ ] Task 3: Update BracketView for results mode (AC: #1, #2, #3, #4)
-  - [ ] Update `src/components/bracket/BracketView.tsx`:
-  - [ ] When `isReadOnly={true}` AND results exist:
+- [x] Task 3: Update BracketView for results mode (AC: #1, #2, #3, #4)
+  - [x] Update `src/components/bracket/BracketView.tsx`:
+  - [x] When `isReadOnly={true}` AND results exist:
     - Classify all picks using `classifyAllPicks()`
-    - Pass `mode="results"` and appropriate `result` prop to each MatchCard
-  - [ ] When `isReadOnly={true}` AND no results: use `mode="readonly"` (Story 3.4 behavior)
-  - [ ] Determine which mode based on: if ANY results exist → use results mode for all MatchCards
+    - Pass `mode="results"` and `classifications` Map to BracketTree/RoundView → MatchCard
+  - [x] When `isReadOnly={true}` AND no results: use `mode="readonly"` (Story 3.4 behavior)
+  - [x] Determine which mode based on: if ANY results exist → use results mode for all MatchCards
 
-- [ ] Task 4: Update bracket page to pass results data (AC: #1)
-  - [ ] Update `src/app/(app)/bracket/page.tsx`:
-  - [ ] Fetch results alongside matches and picks
-  - [ ] Pass results to BracketView component
-  - [ ] BracketView determines correct/wrong/pending per MatchCard
+- [x] Task 4: Update bracket page to pass results data (AC: #1)
+  - [x] Update `src/app/(app)/bracket/page.tsx`:
+  - [x] Fetch results alongside matches and picks
+  - [x] Pass results to BracketView component
+  - [x] BracketView determines correct/wrong/pending per MatchCard
 
-- [ ] Task 5: Add score summary to read-only bracket (AC: #1)
-  - [ ] When viewing bracket in results mode, show a score summary:
+- [x] Task 5: Add score summary to read-only bracket (AC: #1)
+  - [x] When viewing bracket in results mode, show a score summary:
     - "Your Score: X pts — Max Possible: Y"
     - Positioned where ProgressBar was during entry (same slot)
-  - [ ] Fetch or compute score in bracket page Server Component using scoring engine
-  - [ ] Pass score and maxPossible as props to BracketView
+  - [x] Fetch or compute score in bracket page Server Component using scoring engine
+  - [x] Pass score and maxPossible as props to BracketView
 
 ## Dev Notes
 
@@ -209,10 +209,37 @@ export function classifyAllPicks(
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation proceeded without blockers.
+
 ### Completion Notes List
 
+- Implemented `classifyPick()` and `classifyAllPicks()` in `bracket-utils.ts` with full cascading elimination detection (AC #4): a pick is "wrong" even if the match has no result yet, if the picked team was already eliminated in an earlier round.
+- Added `PickClassification` type and extended `MatchCardMode` to `"entry" | "readonly" | "results"` in `types/index.ts`.
+- Updated `MatchCard` with `mode="results"` rendering: correct=emerald-500+✓, wrong=red-500+✗+line-through, pending=slate-300. Each selected row uses `aria-label` for accessibility (AC #5).
+- Added `classifications?: Map<number, PickClassification>` prop threading through `BracketTree` and `RoundView` to `MatchCard`.
+- `BracketView` now accepts `results`, `score`, `maxPossible` props. Automatically switches to `"results"` mode when `isReadOnly=true` and results exist; falls back to `"readonly"` when no results (AC #3).
+- Bracket page fetches results and tournament config, computes score + maxPossible via scoring engine, passes everything to `BracketView`.
+- Score summary "Your Score: X pts — Max Possible: Y" rendered in both desktop (below BracketTree) and mobile (RoundView progressBar slot).
+- 275/275 tests pass. 27 new tests added across bracket-utils.test.ts, MatchCard.test.tsx, and BracketView.test.tsx.
+
 ### File List
+
+- `src/types/index.ts` — Added `"results"` to `MatchCardMode`, added `PickClassification` type
+- `src/lib/bracket-utils.ts` — Added `classifyPick()`, `classifyAllPicks()`
+- `src/lib/bracket-utils.test.ts` — Added 8 tests for new classification functions
+- `src/components/bracket/MatchCard.tsx` — Added `mode="results"` rendering with correct/wrong/pending styling + accessibility aria-labels; added `classification?` prop
+- `src/components/bracket/MatchCard.test.tsx` — Added 10 tests for results mode
+- `src/components/bracket/BracketTree.tsx` — Added `classifications?` prop, passed to MatchCard; connector lines colored in results mode (correct=emerald, wrong=red, pending=slate-300)
+- `src/components/bracket/RoundView.tsx` — Added `classifications?` prop, passed to MatchCard
+- `src/components/bracket/BracketView.tsx` — Added `results`, `score`, `maxPossible` props; results mode switching; score summary (spec format: "Score: X pts - Max: Y pts"); `classifyAllPicks()` integration
+- `src/components/bracket/BracketView.test.tsx` — Added 8 tests for results mode + score summary + mobile path
+- `src/app/(app)/bracket/page.tsx` — Fetches results + tournament config; computes score/maxPossible; passes to BracketView
+
+## Change Log
+
+- Implemented color-coded bracket results (correct/wrong/pending + cascading elimination), score summary, and results data fetching in bracket page (Date: 2026-02-22)
+- Code review fixes: colored connector lines in results mode (BracketTree), score summary format aligned to UX spec ("Score: X pts - Max: Y pts"), `classifyAllPicks` now calls `classifyPick` internally (DRY), added tests for mobile score path and undefined classification fallback (Date: 2026-02-22)

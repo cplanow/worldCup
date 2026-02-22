@@ -105,11 +105,22 @@ describe("AdminMatchCard", () => {
     expect(mexicoBtn?.className).toContain("bg-emerald-50");
   });
 
-  it("in correction mode, confirm/cancel buttons are visible", () => {
+  it("in correction mode, shows 'Update Result' button instead of 'Confirm Result'", () => {
     render(<AdminMatchCard match={baseMatch} result={resolvedResult} onConfirm={vi.fn()} />);
     fireEvent.click(screen.getByText("Mexico"));
-    expect(screen.getByText("Confirm Result")).toBeTruthy();
+    expect(screen.getByText("Update Result")).toBeTruthy();
+    expect(screen.queryByText("Confirm Result")).toBeNull();
     expect(screen.getByText("Cancel")).toBeTruthy();
+  });
+
+  it("does not call onConfirm when re-confirming the same winner", async () => {
+    const onConfirm = vi.fn();
+    render(<AdminMatchCard match={baseMatch} result={resolvedResult} onConfirm={onConfirm} />);
+    // Click the already-stored winner (Brazil)
+    fireEvent.click(screen.getByText("Brazil"));
+    fireEvent.click(screen.getByText("Update Result"));
+    // onConfirm should NOT be called — same winner, no-op
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it("shows TBD names and info text when teams are not set", () => {

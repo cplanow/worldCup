@@ -58,16 +58,16 @@ development_status:
   3-4-read-only-bracket-view: done
   epic-3-retrospective: optional
 
-  epic-4: in-progress
+  epic-4: done
   4-1-scoring-engine-core-calculation-tests: done
   4-2-max-possible-points-elimination-logic: done
   4-3-tiebreaker-logic: done
   4-4-leaderboard-display: done
   epic-4-retrospective: optional
 
-  epic-5: in-progress
+  epic-5: done
   5-1-admin-result-entry: done
-  5-2-admin-result-correction: ready-for-dev
-  5-3-color-coded-bracket-results: ready-for-dev
-  5-4-view-other-participants-brackets: ready-for-dev
+  5-2-admin-result-correction: done
+  5-3-color-coded-bracket-results: done
+  5-4-view-other-participants-brackets: done
   epic-5-retrospective: optional

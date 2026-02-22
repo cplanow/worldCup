@@ -24,6 +24,11 @@ export function AdminMatchCard({ match, result, onConfirm, onCancel }: AdminMatc
 
   const handleConfirm = async () => {
     if (!selectedTeam) return;
+    // Skip server call when re-confirming the same winner
+    if (isResolved && result?.winner === selectedTeam) {
+      setSelectedTeam(null);
+      return;
+    }
     setIsSubmitting(true);
     try {
       await onConfirm(match.id, selectedTeam);
@@ -102,7 +107,7 @@ export function AdminMatchCard({ match, result, onConfirm, onCancel }: AdminMatc
             disabled={isSubmitting}
             className="flex-1 rounded bg-slate-900 py-2 px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {isSubmitting ? "Saving…" : "Confirm Result"}
+            {isSubmitting ? "Saving…" : isResolved ? "Update Result" : "Confirm Result"}
           </button>
           <button
             onClick={handleCancel}

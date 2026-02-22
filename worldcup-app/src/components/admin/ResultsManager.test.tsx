@@ -5,9 +5,10 @@ import type { Match, Result } from "@/types";
 
 vi.mock("@/lib/actions/admin", () => ({
   enterResult: vi.fn(),
+  correctResult: vi.fn(),
 }));
 
-import { enterResult } from "@/lib/actions/admin";
+import { enterResult, correctResult } from "@/lib/actions/admin";
 
 const makeMatch = (
   id: number,
@@ -94,7 +95,8 @@ describe("ResultsManager", () => {
     fireEvent.click(screen.getByText("Brazil"));
     fireEvent.click(screen.getByText("Confirm Result"));
     await waitFor(() => {
-      expect(screen.getByText(/Result saved/)).toBeTruthy();
+      // AdminMatchCard shows "✓ Result saved — tap a team to correct" once resolved
+      expect(screen.getByText(/tap a team to correct/)).toBeTruthy();
     });
   });
 
@@ -136,5 +138,76 @@ describe("ResultsManager", () => {
     const brazilIndex = buttons.findIndex((b) => b.textContent === "Brazil");
     const franceIndex = buttons.findIndex((b) => b.textContent === "France");
     expect(brazilIndex).toBeLessThan(franceIndex);
+  });
+
+  it("calls enterResult (not correctResult) when no initial result exists", async () => {
+    vi.mocked(enterResult).mockResolvedValue({ success: true, data: null });
+    render(<ResultsManager matches={[makeMatch(1, 1, 1)]} initialResults={[]} />);
+    fireEvent.click(screen.getByText("Brazil"));
+    fireEvent.click(screen.getByText("Confirm Result"));
+    await waitFor(() => {
+      expect(enterResult).toHaveBeenCalledWith({ matchId: 1, winner: "Brazil" });
+      expect(correctResult).not.toHaveBeenCalled();
+    });
+  });
+
+  it("calls correctResult (not enterResult) when a result already exists", async () => {
+    vi.mocked(correctResult).mockResolvedValue({ success: true, data: { warning: undefined } });
+    const match = makeMatch(1, 1, 1);
+    const existingResult: Result = { id: 1, matchId: 1, winner: "Brazil", createdAt: "" };
+    render(<ResultsManager matches={[match]} initialResults={[existingResult]} />);
+    fireEvent.click(screen.getByText("Mexico"));
+    fireEvent.click(screen.getByText("Update Result"));
+    await waitFor(() => {
+      expect(correctResult).toHaveBeenCalledWith({ matchId: 1, winner: "Mexico" });
+      expect(enterResult).not.toHaveBeenCalled();
+    });
+  });
+
+  it("shows 'Result updated' feedback after successful correction", async () => {
+    vi.mocked(correctResult).mockResolvedValue({ success: true, data: { warning: undefined } });
+    const match = makeMatch(1, 1, 1);
+    const existingResult: Result = { id: 1, matchId: 1, winner: "Brazil", createdAt: "" };
+    render(<ResultsManager matches={[match]} initialResults={[existingResult]} />);
+    fireEvent.click(screen.getByText("Mexico"));
+    fireEvent.click(screen.getByText("Update Result"));
+    await waitFor(() => {
+      expect(screen.getByText("Result updated")).toBeTruthy();
+    });
+  });
+
+  it("shows warning message when correctResult returns a warning", async () => {
+    const warningMsg = "Result updated. Please verify Round of 16 results — the advancing team has changed.";
+    vi.mocked(correctResult).mockResolvedValue({ success: true, data: { warning: warningMsg } });
+    const match = makeMatch(1, 1, 1);
+    const existingResult: Result = { id: 1, matchId: 1, winner: "Brazil", createdAt: "" };
+    render(<ResultsManager matches={[match]} initialResults={[existingResult]} />);
+    fireEvent.click(screen.getByText("Mexico"));
+    fireEvent.click(screen.getByText("Update Result"));
+    await waitFor(() => {
+      expect(screen.getByText(warningMsg)).toBeTruthy();
+    });
+  });
+
+  it("shows error when correctResult returns failure", async () => {
+    vi.mocked(correctResult).mockResolvedValue({ success: false, error: "Correction failed" });
+    const match = makeMatch(1, 1, 1);
+    const existingResult: Result = { id: 1, matchId: 1, winner: "Brazil", createdAt: "" };
+    render(<ResultsManager matches={[match]} initialResults={[existingResult]} />);
+    fireEvent.click(screen.getByText("Mexico"));
+    fireEvent.click(screen.getByText("Update Result"));
+    await waitFor(() => {
+      expect(screen.getByText("Correction failed")).toBeTruthy();
+    });
+  });
+
+  it("shows 'Result saved' banner after successful initial entry", async () => {
+    vi.mocked(enterResult).mockResolvedValue({ success: true, data: null });
+    render(<ResultsManager matches={[makeMatch(1, 1, 1)]} initialResults={[]} />);
+    fireEvent.click(screen.getByText("Brazil"));
+    fireEvent.click(screen.getByText("Confirm Result"));
+    await waitFor(() => {
+      expect(screen.getByText("Result saved")).toBeTruthy();
+    });
   });
 });

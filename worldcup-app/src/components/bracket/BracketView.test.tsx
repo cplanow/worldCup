@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { BracketView } from "./BracketView";
@@ -14,18 +15,26 @@ vi.mock("@/lib/actions/bracket", () => ({
   submitBracket: vi.fn().mockResolvedValue({ success: true, data: null }),
 }));
 
-// BracketTree mock: captures the onSelect callback so tests can invoke handleSelect directly
+// BracketTree mock: captures the onSelect callback and mode for inspection
 const onSelectRef: { current: ((matchId: number, team: string) => void) | null } = {
   current: null,
 };
+const bracketTreeModeRef: { current: string | null } = { current: null };
 vi.mock("./BracketTree", () => ({
-  BracketTree: ({ onSelect }: { onSelect: (matchId: number, team: string) => void; [key: string]: unknown }) => {
+  BracketTree: ({ onSelect, mode }: { onSelect: (matchId: number, team: string) => void; mode: string; [key: string]: unknown }) => {
     onSelectRef.current = onSelect;
+    bracketTreeModeRef.current = mode;
     return <div data-testid="bracket-tree" />;
   },
 }));
 
-vi.mock("./RoundView", () => ({ RoundView: () => null }));
+const roundViewProgressBarRef: { current: React.ReactNode } = { current: null };
+vi.mock("./RoundView", () => ({
+  RoundView: ({ progressBar }: { progressBar?: React.ReactNode; [key: string]: unknown }) => {
+    roundViewProgressBarRef.current = progressBar ?? null;
+    return null;
+  },
+}));
 
 vi.mock("./ProgressBar", () => ({
   ProgressBar: ({ current }: { current: number; total: number }) => (
@@ -63,6 +72,75 @@ function makePick(matchId: number, team: string, id = matchId): BracketPick {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+describe("BracketView results mode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    onSelectRef.current = null;
+    bracketTreeModeRef.current = null;
+    roundViewProgressBarRef.current = null;
+  });
+
+  it("uses 'results' mode when isReadOnly=true and results are provided", () => {
+    const results = [{ matchId: 1, winner: "Brazil" }];
+    render(<BracketView matches={matches} picks={[]} isReadOnly={true} userId={1} results={results} />);
+    expect(bracketTreeModeRef.current).toBe("results");
+  });
+
+  it("uses 'readonly' mode when isReadOnly=true but no results provided", () => {
+    render(<BracketView matches={matches} picks={[]} isReadOnly={true} userId={1} />);
+    expect(bracketTreeModeRef.current).toBe("readonly");
+  });
+
+  it("uses 'entry' mode when not read-only", () => {
+    render(<BracketView matches={matches} picks={[]} isReadOnly={false} userId={1} />);
+    expect(bracketTreeModeRef.current).toBe("entry");
+  });
+
+  it("shows score summary when results, score, and maxPossible are provided", () => {
+    const results = [{ matchId: 1, winner: "Brazil" }];
+    render(
+      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+        results={results} score={5} maxPossible={20} />
+    );
+    const summary = screen.getByTestId("score-summary-desktop");
+    expect(summary.textContent).toContain("Score:");
+    expect(summary.textContent).toContain("5 pts");
+    expect(summary.textContent).toContain("Max:");
+    expect(summary.textContent).toContain("20 pts");
+  });
+
+  it("does not show score summary when not in results mode", () => {
+    render(
+      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+        score={5} maxPossible={20} />
+    );
+    expect(screen.queryByText(/Score:/)).toBeNull();
+  });
+
+  it("passes scoreSummary (not ProgressBar) as progressBar prop to RoundView in results mode", () => {
+    const results = [{ matchId: 1, winner: "Brazil" }];
+    render(
+      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+        results={results} score={5} maxPossible={20} />
+    );
+    // RoundView should receive a non-null progressBar (the score summary), not a ProgressBar counter
+    expect(roundViewProgressBarRef.current).not.toBeNull();
+    // No pick-count testid means ProgressBar was NOT passed
+    expect(screen.queryByTestId("pick-count")).toBeNull();
+  });
+
+  it("score summary uses spec format: Score X pts - Max Y pts", () => {
+    const results = [{ matchId: 1, winner: "Brazil" }];
+    render(
+      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+        results={results} score={7} maxPossible={22} />
+    );
+    const summary = screen.getByTestId("score-summary-desktop");
+    expect(summary.textContent).toContain("7 pts");
+    expect(summary.textContent).toContain("22 pts");
+  });
+});
+
 describe("BracketView handleSelect", () => {
   beforeEach(() => {
     vi.clearAllMocks();

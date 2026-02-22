@@ -1,4 +1,4 @@
-import type { Match, Pick, MatchSlot, BracketState } from "@/types";
+import type { Match, Pick, MatchSlot, BracketState, PickClassification } from "@/types";
 
 export const ROUND_NAMES: Record<number, string> = {
   1: "Round of 32",
@@ -131,6 +131,54 @@ export function validatePick(
   if (!slot.teamA || !slot.teamB) return false;
 
   return team === slot.teamA || team === slot.teamB;
+}
+
+/**
+ * Classify a single pick as correct, wrong, or pending based on a match result.
+ */
+export function classifyPick(
+  pick: { selectedTeam: string },
+  result: { winner: string } | null
+): PickClassification {
+  if (!result) return "pending";
+  return pick.selectedTeam === result.winner ? "correct" : "wrong";
+}
+
+/**
+ * Classify all picks, including cascading wrong detection.
+ * A pick is "wrong" even if no result exists for that match if the picked team
+ * was already eliminated in an earlier round.
+ */
+export function classifyAllPicks(
+  picks: { matchId: number; selectedTeam: string }[],
+  results: { matchId: number; winner: string }[],
+  matches: { id: number; round: number; teamA: string | null; teamB: string | null }[]
+): Map<number, PickClassification> {
+  const classifications = new Map<number, PickClassification>();
+
+  // Build set of eliminated teams from actual results
+  const eliminatedTeams = new Set<string>();
+  for (const result of results) {
+    const match = matches.find((m) => m.id === result.matchId);
+    if (!match) continue;
+    if (match.teamA && match.teamA !== result.winner) eliminatedTeams.add(match.teamA);
+    if (match.teamB && match.teamB !== result.winner) eliminatedTeams.add(match.teamB);
+  }
+
+  const resultMap = new Map(results.map((r) => [r.matchId, r]));
+
+  for (const pick of picks) {
+    const result = resultMap.get(pick.matchId);
+    if (result) {
+      classifications.set(pick.matchId, classifyPick(pick, result));
+    } else if (eliminatedTeams.has(pick.selectedTeam)) {
+      classifications.set(pick.matchId, "wrong");
+    } else {
+      classifications.set(pick.matchId, "pending");
+    }
+  }
+
+  return classifications;
 }
 
 /**

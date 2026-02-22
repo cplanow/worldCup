@@ -6,7 +6,7 @@ import { BracketTree } from "./BracketTree";
 import { RoundView } from "./RoundView";
 import { ProgressBar } from "./ProgressBar";
 import { Button } from "@/components/ui/button";
-import { computeBracketState, getCascadingClears, validatePick, MAX_PICKS } from "@/lib/bracket-utils";
+import { computeBracketState, getCascadingClears, validatePick, classifyAllPicks, MAX_PICKS } from "@/lib/bracket-utils";
 import { savePick, deletePicks, submitBracket } from "@/lib/actions/bracket";
 import type { Match, Pick } from "@/types";
 
@@ -15,9 +15,12 @@ interface BracketViewProps {
   picks: Pick[];
   isReadOnly: boolean;
   userId: number;
+  results?: { matchId: number; winner: string }[];
+  score?: number;
+  maxPossible?: number;
 }
 
-export function BracketView({ matches, picks: initialPicks, isReadOnly, userId }: BracketViewProps) {
+export function BracketView({ matches, picks: initialPicks, isReadOnly, userId, results, score, maxPossible }: BracketViewProps) {
   const router = useRouter();
   const [localPicks, setLocalPicks] = useState<Pick[]>(initialPicks);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +33,13 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId }
 
   const pickCount = localPicks.length;
   const isComplete = pickCount === MAX_PICKS;
-  const mode = isReadOnly ? "readonly" : "entry";
+  const hasResults = (results?.length ?? 0) > 0;
+  const mode = isReadOnly ? (hasResults ? "results" : "readonly") : "entry";
+
+  const classifications = useMemo(() => {
+    if (mode !== "results" || !results) return undefined;
+    return classifyAllPicks(localPicks, results, matches);
+  }, [mode, localPicks, results, matches]);
 
   function handleSelect(matchId: number, team: string) {
     if (isReadOnly) return;
@@ -102,6 +111,16 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId }
     </div>
   ) : null;
 
+  const scoreSummary =
+    isReadOnly && hasResults && score !== undefined && maxPossible !== undefined ? (
+      <p className="text-sm text-slate-500">
+        Score:{" "}
+        <span className="font-semibold text-slate-900">{score} pts</span>
+        {" - Max: "}
+        <span className="font-semibold text-slate-900">{maxPossible} pts</span>
+      </p>
+    ) : null;
+
   return (
     <div>
       <BracketTree
@@ -109,12 +128,19 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId }
         onSelect={handleSelect}
         disabled={isReadOnly}
         mode={mode}
+        classifications={classifications}
       />
-      {/* Desktop: progress + submit below the bracket tree */}
+      {/* Desktop: progress + submit below the bracket tree (entry mode) */}
       {!isReadOnly && (
         <div className="hidden md:block px-4 mt-6 max-w-sm space-y-3">
           <ProgressBar current={pickCount} total={MAX_PICKS} />
           {submitSection}
+        </div>
+      )}
+      {/* Score summary (results mode) — desktop visible, also passed to mobile RoundView */}
+      {scoreSummary && (
+        <div className="hidden md:block px-4 mt-6 max-w-sm" data-testid="score-summary-desktop">
+          {scoreSummary}
         </div>
       )}
       <RoundView
@@ -122,7 +148,12 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId }
         onSelect={handleSelect}
         disabled={isReadOnly}
         mode={mode}
-        progressBar={!isReadOnly ? <ProgressBar current={pickCount} total={MAX_PICKS} /> : null}
+        classifications={classifications}
+        progressBar={
+          !isReadOnly ? (
+            <ProgressBar current={pickCount} total={MAX_PICKS} />
+          ) : scoreSummary
+        }
         submitSection={submitSection}
       />
     </div>

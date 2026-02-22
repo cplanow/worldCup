@@ -1,6 +1,6 @@
 "use client";
 
-import type { MatchCardMode } from "@/types";
+import type { MatchCardMode, PickClassification } from "@/types";
 
 interface MatchCardProps {
   matchId: number;
@@ -9,6 +9,7 @@ interface MatchCardProps {
   selectedTeam: string | null;
   disabled: boolean;
   mode: MatchCardMode;
+  classification?: PickClassification;
   onSelect: (matchId: number, team: string) => void;
 }
 
@@ -19,6 +20,7 @@ function TeamRow({
   disabled,
   onClick,
   mode,
+  classification,
 }: {
   team: string | null;
   isSelected: boolean;
@@ -26,6 +28,7 @@ function TeamRow({
   disabled: boolean;
   onClick: () => void;
   mode: MatchCardMode;
+  classification?: PickClassification;
 }) {
   const cornerClass = isTop ? "rounded-t-lg" : "rounded-b-lg";
   const baseClass = `flex min-h-[44px] items-center px-3 py-2 text-sm ${cornerClass}`;
@@ -55,6 +58,52 @@ function TeamRow({
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
+        )}
+      </div>
+    );
+  }
+
+  if (mode === "results") {
+    if (!isSelected) {
+      return (
+        <div className={`${baseClass} bg-white text-slate-900`} aria-label={team}>
+          <span className="truncate">{team}</span>
+        </div>
+      );
+    }
+
+    const cls = classification ?? "pending";
+    const resultStyles = {
+      correct: {
+        bg: "bg-emerald-500 text-white",
+        icon: "✓",
+        strikethrough: false,
+        ariaLabel: `${team} — correct pick`,
+      },
+      wrong: {
+        bg: "bg-red-500 text-white",
+        icon: "✗",
+        strikethrough: true,
+        ariaLabel: `${team} — wrong pick`,
+      },
+      pending: {
+        bg: "bg-slate-300 text-slate-600",
+        icon: null,
+        strikethrough: false,
+        ariaLabel: `${team} — pending`,
+      },
+    }[cls];
+
+    return (
+      <div
+        className={`${baseClass} ${resultStyles.bg} justify-between`}
+        aria-label={resultStyles.ariaLabel}
+      >
+        <span className={resultStyles.strikethrough ? "truncate line-through" : "truncate"}>
+          {team}
+        </span>
+        {resultStyles.icon && (
+          <span className="ml-2 shrink-0">{resultStyles.icon}</span>
         )}
       </div>
     );
@@ -99,6 +148,7 @@ export function MatchCard({
   selectedTeam,
   disabled,
   mode,
+  classification,
   onSelect,
 }: MatchCardProps) {
   const isEmpty = !teamA && !teamB;
@@ -116,6 +166,7 @@ export function MatchCard({
         disabled={disabled || !teamA}
         onClick={() => teamA && onSelect(matchId, teamA)}
         mode={mode}
+        classification={selectedTeam === teamA ? classification : undefined}
       />
       {!isEmpty && <div className="border-t border-slate-200" />}
       <TeamRow
@@ -125,6 +176,7 @@ export function MatchCard({
         disabled={disabled || !teamB}
         onClick={() => teamB && onSelect(matchId, teamB)}
         mode={mode}
+        classification={selectedTeam === teamB ? classification : undefined}
       />
     </div>
   );

@@ -87,6 +87,108 @@ describe("MatchCard — entry mode", () => {
   });
 });
 
+describe("MatchCard — results mode", () => {
+  it("renders team names as non-button elements in results mode", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="correct" onSelect={noop} />
+    );
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("shows emerald-500 background for correct pick (selected row)", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="correct" onSelect={noop} />
+    );
+    const el = screen.getByLabelText("Brazil — correct pick");
+    expect(el.className).toContain("bg-emerald-500");
+  });
+
+  it("shows checkmark ✓ icon for correct pick", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="correct" onSelect={noop} />
+    );
+    expect(screen.getByLabelText("Brazil — correct pick").textContent).toContain("✓");
+  });
+
+  it("shows red-500 background for wrong pick (selected row)", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Germany"
+        disabled={true} mode="results" classification="wrong" onSelect={noop} />
+    );
+    const el = screen.getByLabelText("Germany — wrong pick");
+    expect(el.className).toContain("bg-red-500");
+  });
+
+  it("shows ✗ icon for wrong pick", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Germany"
+        disabled={true} mode="results" classification="wrong" onSelect={noop} />
+    );
+    expect(screen.getByLabelText("Germany — wrong pick").textContent).toContain("✗");
+  });
+
+  it("applies line-through to team name for wrong pick", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Germany"
+        disabled={true} mode="results" classification="wrong" onSelect={noop} />
+    );
+    const el = screen.getByLabelText("Germany — wrong pick");
+    const nameSpan = el.querySelector("span.line-through");
+    expect(nameSpan).toBeTruthy();
+  });
+
+  it("shows slate-300 background for pending pick (selected row)", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="pending" onSelect={noop} />
+    );
+    const el = screen.getByLabelText("Brazil — pending");
+    expect(el.className).toContain("bg-slate-300");
+  });
+
+  it("unselected team has white background in results mode", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="correct" onSelect={noop} />
+    );
+    const el = screen.getByLabelText("Germany");
+    expect(el.className).toContain("bg-white");
+  });
+
+  it("does not call onSelect when clicked in results mode", async () => {
+    const onSelect = vi.fn();
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="correct" onSelect={onSelect} />
+    );
+    await userEvent.click(screen.getByText("Germany"));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("no icon shown for pending pick", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" classification="pending" onSelect={noop} />
+    );
+    const el = screen.getByLabelText("Brazil — pending");
+    expect(el.textContent).not.toContain("✓");
+    expect(el.textContent).not.toContain("✗");
+  });
+
+  it("falls back to pending style when selected but classification prop is undefined", () => {
+    render(
+      <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
+        disabled={true} mode="results" onSelect={noop} />
+    );
+    // No classification prop — should default to "pending" styling
+    const el = screen.getByLabelText("Brazil — pending");
+    expect(el.className).toContain("bg-slate-300");
+  });
+});
+
 describe("MatchCard — readonly mode", () => {
   it("renders team names as non-button elements (divs)", () => {
     render(
