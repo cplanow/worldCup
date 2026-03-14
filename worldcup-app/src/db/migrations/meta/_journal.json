@@ -36,6 +36,13 @@
       "when": 1771716139023,
       "tag": "0004_superb_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1773462875770,
+      "tag": "0005_orange_susan_delgado",
+      "breakpoints": true
     }
   ]
 }

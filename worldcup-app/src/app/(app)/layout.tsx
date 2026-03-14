@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { TabNav } from "@/components/navigation/TabNav";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export default async function AppLayout({
   children,
@@ -31,10 +32,11 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-slate-200 bg-white px-4 py-3">
+      <header className="border-b border-slate-200 bg-white px-4 py-3 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-slate-900">
           worldCup
         </h1>
+        <LogoutButton />
       </header>
       <TabNav isAdmin={isAdmin} />
       <main>{children}</main>

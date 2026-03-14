@@ -1,8 +1,10 @@
 export type User = {
   id: number;
   username: string;
+  passwordHash: string | null;
   createdAt: string;
   bracketSubmitted: boolean;
+  groupPicksSubmitted: boolean;
 };
 
 export type Match = {
@@ -18,6 +20,9 @@ export type Match = {
 export type TournamentConfig = {
   id: number;
   isLocked: boolean;
+  groupStageLocked: boolean;
+  pointsGroupAdvance: number;
+  pointsGroupExact: number;
   pointsR32: number;
   pointsR16: number;
   pointsQf: number;
@@ -100,3 +105,31 @@ export interface PlayerScore {
   username: string;
   score: number;
 }
+
+export type Group = {
+  id: number;
+  name: string;
+  createdAt: string;
+};
+
+export type GroupTeam = {
+  id: number;
+  groupId: number;
+  teamName: string;
+  finalPosition: number | null;
+  createdAt: string;
+};
+
+export type GroupPick = {
+  id: number;
+  userId: number;
+  groupId: number;
+  firstPlace: string;
+  secondPlace: string;
+  createdAt: string;
+};
+
+export type CombinedLeaderboardEntry = LeaderboardEntry & {
+  groupScore: number;
+  bracketScore: number;
+};

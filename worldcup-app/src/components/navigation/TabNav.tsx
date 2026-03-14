@@ -9,6 +9,7 @@ interface TabNavProps {
 
 const tabs = [
   { label: "Leaderboard", href: "/leaderboard" },
+  { label: "Groups", href: "/groups" },
   { label: "My Bracket", href: "/bracket" },
 ];
 

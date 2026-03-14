@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { matches, tournamentConfig, results } from "@/db/schema";
+import { matches, tournamentConfig, results, groups, groupTeams, groupPicks, users } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import type { TournamentConfig, Result } from "@/types";
@@ -123,6 +123,9 @@ export async function getTournamentConfig(): Promise<TournamentConfig> {
   return {
     id: config.id,
     isLocked: config.isLocked,
+    groupStageLocked: config.groupStageLocked,
+    pointsGroupAdvance: config.pointsGroupAdvance,
+    pointsGroupExact: config.pointsGroupExact,
     pointsR32: config.pointsR32,
     pointsR16: config.pointsR16,
     pointsQf: config.pointsQf,
@@ -373,4 +376,156 @@ async function advanceWinner(round: number, position: number, winner: string) {
       .set(isTeamA ? { teamA: winner } : { teamB: winner })
       .where(eq(matches.id, nextMatch.id));
   }
+}
+
+export async function setupGroup(data: {
+  name: string;
+  teams: string[];
+}): Promise<ActionResult<{ groupId: number }>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const { name, teams } = data;
+
+  if (!name.trim()) {
+    return { success: false, error: "Group name is required" };
+  }
+
+  if (teams.length !== 4) {
+    return { success: false, error: "Exactly 4 teams are required" };
+  }
+
+  if (teams.some((t) => !t.trim())) {
+    return { success: false, error: "All team names must be non-empty" };
+  }
+
+  // Check if group name already exists -> upsert
+  const existing = await db
+    .select()
+    .from(groups)
+    .where(eq(groups.name, name.trim()))
+    .get();
+
+  let groupId: number;
+  if (existing) {
+    groupId = existing.id;
+    // Delete old teams and insert new ones
+    await db.delete(groupTeams).where(eq(groupTeams.groupId, groupId));
+  } else {
+    const result = await db
+      .insert(groups)
+      .values({ name: name.trim() })
+      .returning();
+    groupId = result[0].id;
+  }
+
+  // Insert 4 groupTeam rows
+  await db.insert(groupTeams).values(
+    teams.map((teamName) => ({
+      groupId,
+      teamName: teamName.trim(),
+    }))
+  );
+
+  revalidatePath("/admin");
+  return { success: true, data: { groupId } };
+}
+
+export async function enterGroupResult(data: {
+  groupId: number;
+  positions: { teamName: string; position: number }[];
+}): Promise<ActionResult<null>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const { groupId, positions } = data;
+
+  // Validate positions has 4 entries with positions 1-4
+  if (positions.length !== 4) {
+    return { success: false, error: "Exactly 4 positions are required" };
+  }
+
+  const positionNumbers = positions.map((p) => p.position).sort();
+  if (
+    positionNumbers[0] !== 1 ||
+    positionNumbers[1] !== 2 ||
+    positionNumbers[2] !== 3 ||
+    positionNumbers[3] !== 4
+  ) {
+    return { success: false, error: "Positions must be 1, 2, 3, and 4" };
+  }
+
+  // Validate group exists
+  const group = await db.select().from(groups).where(eq(groups.id, groupId)).get();
+  if (!group) return { success: false, error: "Group not found" };
+
+  // Update finalPosition on each groupTeam row
+  for (const entry of positions) {
+    const team = await db
+      .select()
+      .from(groupTeams)
+      .where(
+        and(eq(groupTeams.groupId, groupId), eq(groupTeams.teamName, entry.teamName))
+      )
+      .get();
+
+    if (!team) {
+      return {
+        success: false,
+        error: `Team "${entry.teamName}" not found in group`,
+      };
+    }
+
+    await db
+      .update(groupTeams)
+      .set({ finalPosition: entry.position })
+      .where(eq(groupTeams.id, team.id));
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  return { success: true, data: null };
+}
+
+export async function toggleGroupStageLock(
+  locked: boolean
+): Promise<ActionResult<{ groupStageLocked: boolean }>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (typeof locked !== "boolean") {
+    return { success: false, error: "Invalid lock value" };
+  }
+
+  const config = await getTournamentConfig();
+
+  await db
+    .update(tournamentConfig)
+    .set({ groupStageLocked: locked })
+    .where(eq(tournamentConfig.id, config.id));
+
+  revalidatePath("/admin");
+  return { success: true, data: { groupStageLocked: locked } };
+}
+
+export async function adminResetPassword(
+  userId: number
+): Promise<ActionResult<null>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user) return { success: false, error: "User not found" };
+
+  await db
+    .update(users)
+    .set({ passwordHash: null })
+    .where(eq(users.id, userId));
+
+  revalidatePath("/admin");
+  return { success: true, data: null };
 }

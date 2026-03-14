@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { UsernameForm } from "@/components/UsernameForm";
+import { AuthContainer } from "@/components/AuthContainer";
 
 export default async function Home() {
   const cookieStore = await cookies();
@@ -20,18 +20,10 @@ export default async function Home() {
       if (user.bracketSubmitted) {
         redirect("/leaderboard");
       }
-
-      // TODO: Check tournament_config.is_locked when table exists (Story 2.2)
-      const isLocked = false;
-
-      if (isLocked) {
-        redirect("/leaderboard?locked=1");
-      }
-
       redirect("/bracket");
     }
 
-    // Stale cookie — user not found in DB, clear it
+    // Stale cookie -- user not found in DB, clear it
     cookieStore.delete("username");
   }
 
@@ -41,7 +33,7 @@ export default async function Home() {
         <h1 className="text-4xl font-bold tracking-tight text-slate-900">
           worldCup
         </h1>
-        <UsernameForm />
+        <AuthContainer />
       </main>
     </div>
   );

@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/table";
 
 interface LeaderboardTableProps {
-  entries: LeaderboardEntry[];
+  entries: (LeaderboardEntry & { groupScore?: number; bracketScore?: number })[];
   currentUsername: string;
 }
 
 export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableProps) {
   const router = useRouter();
+  const showGroupColumns = entries.some((e) => (e.groupScore ?? 0) > 0 || (e.bracketScore ?? 0) > 0);
 
   const handleRowClick = (username: string) => {
     if (username === currentUsername) {
@@ -45,8 +46,18 @@ export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableP
           <TableHead scope="col" className="px-4">
             Name
           </TableHead>
+          {showGroupColumns && (
+            <TableHead scope="col" className="text-right px-4">
+              Group
+            </TableHead>
+          )}
+          {showGroupColumns && (
+            <TableHead scope="col" className="text-right px-4">
+              Bracket
+            </TableHead>
+          )}
           <TableHead scope="col" className="text-right px-4">
-            Score
+            {showGroupColumns ? "Total" : "Score"}
           </TableHead>
           <TableHead scope="col" className="text-right px-4">
             Max
@@ -76,6 +87,16 @@ export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableP
                 {entry.rank === 1 ? "👑 1" : entry.rank}
               </TableCell>
               <TableCell className="px-4 py-3">{entry.username}</TableCell>
+              {showGroupColumns && (
+                <TableCell className="text-right px-4 py-3">
+                  {entry.groupScore ?? 0}
+                </TableCell>
+              )}
+              {showGroupColumns && (
+                <TableCell className="text-right px-4 py-3">
+                  {entry.bracketScore ?? 0}
+                </TableCell>
+              )}
               <TableCell className="text-right px-4 py-3">
                 {entry.score}
               </TableCell>
