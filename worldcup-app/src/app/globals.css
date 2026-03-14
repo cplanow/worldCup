@@ -124,3 +124,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Trophy Room Theme Overrides */
+@layer base {
+  :root {
+    --color-forest: #0F2E23;
+    --color-forest-light: #1A4A38;
+    --color-forest-muted: #2D5F4E;
+    --color-gold: #B8960C;
+    --color-gold-bright: #D4AF37;
+    --color-gold-muted: #8B7A2E;
+    --color-ivory: #FAFAF5;
+    --color-ivory-warm: #F5F4EF;
+  }
+
+  body {
+    font-family: var(--font-body), system-ui, sans-serif;
+    background-color: var(--color-ivory);
+    color: #1a2e23;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display), system-ui, sans-serif;
+  }
+  .font-body {
+    font-family: var(--font-body), system-ui, sans-serif;
+  }
+}

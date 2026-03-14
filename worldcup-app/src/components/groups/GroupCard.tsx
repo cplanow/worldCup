@@ -53,14 +53,14 @@ export function GroupCard({ groupId, groupName, teams, currentPick, onSave, disa
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900">Group {groupName}</h3>
+    <div className="rounded-xl border border-slate-200/80 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+      <div className="bg-[#0F2E23] px-4 py-2.5 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-white">Group {groupName}</h3>
         {isComplete && !hasChanged && (
-          <span className="text-xs text-emerald-600 font-medium">Saved</span>
+          <span className="text-xs text-[#D4AF37] font-medium">Saved</span>
         )}
       </div>
-      <div className="space-y-2">
+      <div className="p-4 space-y-2">
         {teams.map((team) => {
           const is1st = firstPlace === team;
           const is2nd = secondPlace === team;
@@ -71,7 +71,7 @@ export function GroupCard({ groupId, groupName, teams, currentPick, onSave, disa
               disabled={disabled}
               className={`w-full rounded px-3 py-2 text-left text-sm font-medium transition-colors ${
                 is1st
-                  ? "bg-emerald-100 text-emerald-800 ring-2 ring-emerald-500"
+                  ? "bg-[#D4AF37]/15 text-[#8B7A2E] ring-2 ring-[#D4AF37]"
                   : is2nd
                   ? "bg-blue-100 text-blue-800 ring-2 ring-blue-500"
                   : "bg-slate-50 text-slate-700 hover:bg-slate-100"
@@ -79,7 +79,7 @@ export function GroupCard({ groupId, groupName, teams, currentPick, onSave, disa
             >
               <span className="flex items-center justify-between">
                 <span>{team}</span>
-                {is1st && <span className="text-xs font-bold">1st</span>}
+                {is1st && <span className="text-xs font-bold text-[#B8960C]">1st</span>}
                 {is2nd && <span className="text-xs font-bold">2nd</span>}
               </span>
             </button>
@@ -91,7 +91,7 @@ export function GroupCard({ groupId, groupName, teams, currentPick, onSave, disa
         <button
           onClick={handleSave}
           disabled={saving || disabled}
-          className="mt-3 w-full rounded bg-slate-900 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-300"
+          className="mt-3 w-full rounded-lg bg-[#0F2E23] py-2 text-sm font-semibold text-white hover:bg-[#1A4A38] disabled:bg-slate-200 disabled:text-slate-400"
         >
           {saving ? "Saving..." : "Save Pick"}
         </button>

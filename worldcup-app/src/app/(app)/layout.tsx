@@ -32,8 +32,8 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-slate-200 bg-white px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+      <header className="bg-[#0F2E23] px-4 py-3 flex items-center justify-between">
+        <h1 className="font-display text-xl font-bold tracking-tight text-[#D4AF37]">
           worldCup
         </h1>
         <LogoutButton />

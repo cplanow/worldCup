@@ -36,33 +36,33 @@ export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableP
   };
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-xl border border-slate-200/80">
     <Table>
       <TableHeader>
-        <TableRow>
-          <TableHead scope="col" className="w-14 text-center px-4">
+        <TableRow className="bg-[#0F2E23]">
+          <TableHead scope="col" className="w-14 text-center px-4 text-[#8BAF9E]">
             Rank
           </TableHead>
-          <TableHead scope="col" className="px-4">
+          <TableHead scope="col" className="px-4 text-[#8BAF9E]">
             Name
           </TableHead>
           {showGroupColumns && (
-            <TableHead scope="col" className="text-right px-4">
+            <TableHead scope="col" className="text-right px-4 text-[#8BAF9E]">
               Group
             </TableHead>
           )}
           {showGroupColumns && (
-            <TableHead scope="col" className="text-right px-4">
+            <TableHead scope="col" className="text-right px-4 text-[#8BAF9E]">
               Bracket
             </TableHead>
           )}
-          <TableHead scope="col" className="text-right px-4">
+          <TableHead scope="col" className="text-right px-4 text-[#8BAF9E]">
             {showGroupColumns ? "Total" : "Score"}
           </TableHead>
-          <TableHead scope="col" className="text-right px-4">
+          <TableHead scope="col" className="text-right px-4 text-[#8BAF9E]">
             Max
           </TableHead>
-          <TableHead scope="col" className="px-4">
+          <TableHead scope="col" className="px-4 text-[#8BAF9E]">
             Champion
           </TableHead>
         </TableRow>
@@ -79,12 +79,16 @@ export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableP
               onKeyDown={(e) => handleRowKeyDown(e, entry.username)}
               className={
                 isCurrentUser
-                  ? "bg-emerald-50 hover:bg-emerald-50 cursor-pointer"
+                  ? "bg-emerald-50/60 hover:bg-emerald-50 cursor-pointer"
                   : "cursor-pointer hover:bg-slate-50"
               }
             >
               <TableCell className="text-center font-semibold px-4 py-3">
-                {entry.rank === 1 ? "👑 1" : entry.rank}
+                {entry.rank === 1 ? (
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#D4AF37] text-xs font-bold text-[#0F2E23]">1</span>
+                ) : (
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{entry.rank}</span>
+                )}
               </TableCell>
               <TableCell className="px-4 py-3">{entry.username}</TableCell>
               {showGroupColumns && (
@@ -108,11 +112,11 @@ export function LeaderboardTable({ entries, currentUsername }: LeaderboardTableP
               <TableCell className="px-4 py-3">
                 {entry.championPick ? (
                   <span
-                    className={`rounded px-1.5 py-0.5 text-sm${
+                    className={
                       entry.isChampionEliminated
-                        ? " bg-red-100 line-through"
-                        : " bg-emerald-100"
-                    }`}
+                        ? "rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-600 line-through"
+                        : "rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700"
+                    }
                   >
                     {entry.championPick}
                   </span>

@@ -21,7 +21,7 @@ export function TabNav({ isAdmin }: TabNavProps) {
     : tabs;
 
   return (
-    <nav className="border-b border-slate-200 bg-white" aria-label="Main navigation">
+    <nav className="bg-[#0F2E23] border-b border-[#1A4A38]" aria-label="Main navigation">
       <div className="flex">
         {allTabs.map((tab) => {
           const isActive = pathname === tab.href;
@@ -31,8 +31,8 @@ export function TabNav({ isAdmin }: TabNavProps) {
               href={tab.href}
               className={`px-4 py-3 text-sm font-medium transition-colors ${
                 isActive
-                  ? "border-b-2 border-slate-900 font-bold text-slate-900"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "border-b-2 border-[#D4AF37] font-bold text-[#D4AF37]"
+                  : "text-[#8BAF9E] hover:text-[#C8DDD2]"
               }`}
               aria-current={isActive ? "page" : undefined}
             >

@@ -53,9 +53,11 @@ describe("LeaderboardTable", () => {
     expect(screen.getByText("3")).toBeTruthy();
   });
 
-  it("shows crown emoji next to rank 1", () => {
+  it("shows rank 1 with gold badge styling", () => {
     render(<LeaderboardTable entries={ENTRIES} currentUsername="carol" />);
-    expect(screen.getByText("👑 1")).toBeTruthy();
+    const rankOneSpan = screen.getByText("1");
+    expect(rankOneSpan.className).toContain("bg-[#D4AF37]");
+    expect(rankOneSpan.className).toContain("rounded-full");
   });
 
   it("highlights the current user row with emerald background", () => {

@@ -63,14 +63,14 @@ export function GroupPicksView({ userId, groups, existingPicks, isSubmitted, isL
           {pickedCount} of {totalGroups} groups picked
         </p>
         {isSubmitted && (
-          <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+          <span className="rounded-full bg-[#D4AF37]/15 px-3 py-1 text-xs font-semibold text-[#8B7A2E]">
             Submitted
           </span>
         )}
       </div>
 
       {isLocked && !isSubmitted && (
-        <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
           Group picks are locked.
         </div>
       )}
@@ -99,7 +99,7 @@ export function GroupPicksView({ userId, groups, existingPicks, isSubmitted, isL
           <Button
             onClick={handleSubmit}
             disabled={!allPicked || submitting}
-            className="w-full h-12 bg-slate-900 text-base font-semibold text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400"
+            className="w-full h-12 bg-[#0F2E23] text-base font-semibold text-white hover:bg-[#1A4A38] disabled:bg-slate-100 disabled:text-slate-400 rounded-xl"
           >
             {submitting ? "Submitting..." : `Submit Group Picks (${pickedCount}/${totalGroups})`}
           </Button>

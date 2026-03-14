@@ -54,7 +54,7 @@ export default async function BracketPage() {
 
   return (
     <div className="px-4 py-6">
-      <h1 className="text-2xl font-bold mb-4 text-slate-900">My Bracket</h1>
+      <h1 className="font-display text-2xl font-bold mb-4 text-slate-900">My Bracket</h1>
       <BracketView
         matches={allMatches}
         picks={userPicks}

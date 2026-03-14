@@ -91,7 +91,7 @@ export default async function LeaderboardPage({
 
   return (
     <div className="px-4 py-6">
-      <h1 className="text-2xl font-bold mb-4 text-slate-900">Leaderboard</h1>
+      <h1 className="font-display text-2xl font-bold mb-4 text-slate-900">Leaderboard</h1>
       {isLocked && (
         <div className="mb-4">
           <LockMessage />

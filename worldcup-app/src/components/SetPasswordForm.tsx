@@ -41,9 +41,9 @@ export function SetPasswordForm({ username }: SetPasswordFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
-      <p className="text-center text-sm text-slate-600">
-        Welcome back, {username}! Please set a password to secure your account.
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 rounded-2xl bg-white/10 backdrop-blur-sm p-6 border border-white/10">
+      <p className="text-center text-sm text-[#8BAF9E] mb-4">
+        Welcome back, <span className="font-semibold text-[#D4AF37]">{username}</span>! Please set a password to secure your account.
       </p>
       <Input
         name="password"
@@ -52,7 +52,7 @@ export function SetPasswordForm({ username }: SetPasswordFormProps) {
         required
         autoComplete="new-password"
         autoFocus
-        className="h-12 text-center text-base"
+        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
       />
       <Input
         name="confirmPassword"
@@ -60,15 +60,15 @@ export function SetPasswordForm({ username }: SetPasswordFormProps) {
         placeholder="Confirm password"
         required
         autoComplete="new-password"
-        className="h-12 text-center text-base"
+        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
       />
       {error && (
-        <p className="text-center text-sm text-red-600">{error}</p>
+        <p className="text-center text-sm text-red-400">{error}</p>
       )}
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="h-12 bg-slate-900 text-base font-semibold text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400"
+        className="h-12 bg-[#D4AF37] text-base font-semibold text-[#0F2E23] hover:bg-[#C9A832] disabled:bg-white/10 disabled:text-white/30 rounded-xl"
       >
         {isSubmitting ? "Setting password..." : "Set Password"}
       </Button>

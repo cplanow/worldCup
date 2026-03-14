@@ -28,11 +28,14 @@ export default async function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0F2E23] via-[#132F25] to-[#0A1F17]">
       <main className="flex w-full max-w-sm flex-col items-center gap-8 px-6">
-        <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-          worldCup
-        </h1>
+        <div className="text-center">
+          <h1 className="font-display text-5xl font-extrabold tracking-tight text-[#D4AF37]">
+            worldCup
+          </h1>
+          <p className="mt-2 text-sm text-[#8BAF9E]">Bracket Pool 2026</p>
+        </div>
         <AuthContainer />
       </main>
     </div>

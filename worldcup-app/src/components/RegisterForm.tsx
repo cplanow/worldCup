@@ -49,7 +49,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 rounded-2xl bg-white/10 backdrop-blur-sm p-6 border border-white/10">
       <Input
         name="username"
         type="text"
@@ -57,7 +57,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         required
         autoComplete="username"
         autoFocus
-        className="h-12 text-center text-base"
+        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
       />
       <Input
         name="password"
@@ -65,7 +65,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         placeholder="Password"
         required
         autoComplete="new-password"
-        className="h-12 text-center text-base"
+        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
       />
       <Input
         name="confirmPassword"
@@ -73,22 +73,22 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         placeholder="Confirm password"
         required
         autoComplete="new-password"
-        className="h-12 text-center text-base"
+        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
       />
       {error && (
-        <p className="text-center text-sm text-red-600">{error}</p>
+        <p className="text-center text-sm text-red-400">{error}</p>
       )}
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="h-12 bg-slate-900 text-base font-semibold text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400"
+        className="h-12 bg-[#D4AF37] text-base font-semibold text-[#0F2E23] hover:bg-[#C9A832] disabled:bg-white/10 disabled:text-white/30 rounded-xl"
       >
         {isSubmitting ? "Creating..." : "Create Account"}
       </Button>
       <button
         type="button"
         onClick={onSwitchToLogin}
-        className="text-sm text-slate-500 hover:text-slate-700 underline"
+        className="text-sm text-[#8BAF9E] hover:text-[#D4AF37] transition-colors"
       >
         Already have an account? Log in
       </button>

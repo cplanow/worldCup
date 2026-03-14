@@ -23,12 +23,12 @@ export function GroupResults({ groupName, teams, pick, pointsGroupAdvance, point
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900">Group {groupName}</h3>
-        <span className="text-sm font-semibold text-slate-700">{score} pts</span>
+    <div className="rounded-xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
+      <div className="bg-[#0F2E23] px-4 py-2.5 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-white">Group {groupName}</h3>
+        <span className="text-sm font-semibold text-[#D4AF37]">{score} pts</span>
       </div>
-      <div className="space-y-1">
+      <div className="p-4 space-y-1">
         {sorted.map((team) => {
           const isPicked1st = pick?.firstPlace === team.teamName;
           const isPicked2nd = pick?.secondPlace === team.teamName;
@@ -39,9 +39,9 @@ export function GroupResults({ groupName, teams, pick, pointsGroupAdvance, point
 
           let bgColor = "";
           if (isPicked1st || isPicked2nd) {
-            if (exactCorrect) bgColor = "bg-emerald-100 text-emerald-800";
-            else if (advanced) bgColor = "bg-blue-50 text-blue-800";
-            else bgColor = "bg-red-50 text-red-800 line-through";
+            if (exactCorrect) bgColor = "bg-emerald-50 text-emerald-800 rounded-lg";
+            else if (advanced) bgColor = "bg-blue-50 text-blue-800 rounded-lg";
+            else bgColor = "bg-red-50 text-red-600 line-through rounded-lg";
           }
 
           return (
