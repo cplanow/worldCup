@@ -23,8 +23,8 @@ export default async function Home() {
       redirect("/bracket");
     }
 
-    // Stale cookie -- user not found in DB, clear it
-    cookieStore.delete("username");
+    // Stale cookie — user not found in DB; just show login form
+    // (cookie deletion must happen in a Server Action, not a page render)
   }
 
   return (
