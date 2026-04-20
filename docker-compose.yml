@@ -1,0 +1,40 @@
+# worldCup — self-hosted deployment
+#
+# Deploy target: sparta (10.0.20.22)
+# External URL:  https://worldcup.chris.planow.com (public, no auth)
+#
+# Setup on host:
+#   cd ~/worldCup
+#   cp worldcup-app/.env.example worldcup-app/.env   # or create .env at repo root
+#   docker compose up -d --build
+#
+# .env file (at repo root) must contain:
+#   TURSO_CONNECTION_URL=libsql://<db>.turso.io
+#   TURSO_AUTH_TOKEN=<rotated after Vercel incident 2026-04-20>
+#   ADMIN_USERNAME=<admin>
+#
+# Port mapping: 3002:3000 (3000/3001 already taken by golfModel/draftModel)
+
+services:
+  worldcup:
+    build:
+      context: ./worldcup-app
+      dockerfile: Dockerfile
+    image: worldcup-app:local
+    container_name: worldcup-app
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      TURSO_CONNECTION_URL: ${TURSO_CONNECTION_URL}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
