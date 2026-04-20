@@ -39,7 +39,9 @@ services:
       TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      # Force IPv4 — BusyBox wget resolves 'localhost' to ::1 first and Next.js
+      # binds to 0.0.0.0 (IPv4) which returns "connection refused" on IPv6.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
