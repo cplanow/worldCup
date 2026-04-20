@@ -17,12 +17,20 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Turso is reached during `next build`'s data-collection phase for any
+# route that queries the DB at module load (e.g. /bracket/[username]
+# which calls db.select() directly). Pass these as build args so the
+# builder stage can reach Turso. These values do NOT end up in the
+# final runner image (they're only in the builder stage) but they DO
+# appear in build logs — acceptable for a trusted build host.
+ARG TURSO_CONNECTION_URL
+ARG TURSO_AUTH_TOKEN
+ENV TURSO_CONNECTION_URL=${TURSO_CONNECTION_URL}
+ENV TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Drizzle needs TURSO_* to compile the client config at build time in some setups,
-# but runtime reads from process.env. Provide empty defaults so `next build`
-# doesn't complain about undefined env at build, if it does.
 RUN npm run build
 
 # ----------------------------------------------------------------------------
