@@ -1,11 +1,11 @@
 import type { LeaderboardEntry } from "@/types";
 
 /**
- * Scoring rules:
- * - Correctly picking a team that advances (finishes 1st or 2nd): 2 pts (pointsGroupAdvance)
- * - Correctly picking the exact position (1st as 1st, 2nd as 2nd): +1 bonus pt (pointsGroupExact)
- * - Max per group: 6 pts (2+2+1+1)
- * - Max total: 12 groups x 6 = 72 pts
+ * Scoring rules (2026 research-aligned, Option B):
+ * - 2 pts per team placed in correct finishing position (1st, 2nd, 3rd, or 4th)
+ * - +5 pt bonus when all 4 positions are correct (perfect group)
+ * - Max per group: 4×2 + 5 = 13 pts
+ * - Max total: 12 groups × 13 = 156 pts
  */
 
 // ──────────────────────────────────────────────────────────────
@@ -16,6 +16,8 @@ export interface GroupPickData {
   groupId: number;
   firstPlace: string;
   secondPlace: string;
+  thirdPlace: string | null;
+  fourthPlace: string | null;
 }
 
 export interface GroupResultData {
@@ -24,8 +26,8 @@ export interface GroupResultData {
 }
 
 export interface GroupScoringConfig {
-  pointsGroupAdvance: number; // default 2
-  pointsGroupExact: number;   // default 1
+  pointsGroupPosition: number; // default 2
+  pointsGroupPerfect: number;  // default 5
 }
 
 export interface CombinedLeaderboardEntry {
@@ -38,8 +40,8 @@ export interface CombinedLeaderboardEntry {
 }
 
 export const DEFAULT_GROUP_CONFIG: GroupScoringConfig = {
-  pointsGroupAdvance: 2,
-  pointsGroupExact: 1,
+  pointsGroupPosition: 2,
+  pointsGroupPerfect: 5,
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -48,6 +50,9 @@ export const DEFAULT_GROUP_CONFIG: GroupScoringConfig = {
 
 /**
  * Calculate the score for a single group pick against the actual result.
+ * Awards pointsGroupPosition per team in correct position, plus pointsGroupPerfect
+ * bonus if all 4 positions are correct.
+ * Null 3rd/4th picks score 0 for those slots (backwards compat with pre-Option-B picks).
  * Pure function — no database access, no side effects.
  */
 export function calculateGroupScore(
@@ -55,28 +60,28 @@ export function calculateGroupScore(
   result: GroupResultData,
   config: GroupScoringConfig
 ): number {
-  let score = 0;
+  const pickedByPosition: (string | null)[] = [
+    pick.firstPlace,
+    pick.secondPlace,
+    pick.thirdPlace,
+    pick.fourthPlace,
+  ];
 
-  const firstPlaceResult = result.teams.find((t) => t.teamName === pick.firstPlace);
-  if (firstPlaceResult) {
-    const advanced = firstPlaceResult.finalPosition === 1 || firstPlaceResult.finalPosition === 2;
-    if (advanced) {
-      score += config.pointsGroupAdvance;
-      if (firstPlaceResult.finalPosition === 1) {
-        score += config.pointsGroupExact;
-      }
+  let score = 0;
+  let correctCount = 0;
+
+  for (let i = 0; i < 4; i++) {
+    const picked = pickedByPosition[i];
+    if (!picked) continue;
+    const teamResult = result.teams.find((t) => t.teamName === picked);
+    if (teamResult && teamResult.finalPosition === i + 1) {
+      score += config.pointsGroupPosition;
+      correctCount++;
     }
   }
 
-  const secondPlaceResult = result.teams.find((t) => t.teamName === pick.secondPlace);
-  if (secondPlaceResult) {
-    const advanced = secondPlaceResult.finalPosition === 1 || secondPlaceResult.finalPosition === 2;
-    if (advanced) {
-      score += config.pointsGroupAdvance;
-      if (secondPlaceResult.finalPosition === 2) {
-        score += config.pointsGroupExact;
-      }
-    }
+  if (correctCount === 4) {
+    score += config.pointsGroupPerfect;
   }
 
   return score;
@@ -88,7 +93,6 @@ export function calculateGroupScore(
 
 /**
  * Calculate the total group stage score across all groups.
- * Sums calculateGroupScore for each pick that has a matching result.
  * Pure function — no database access, no side effects.
  */
 export function calculateGroupStageScore(
@@ -111,27 +115,62 @@ export function calculateGroupStageScore(
 // buildCombinedLeaderboard
 // ──────────────────────────────────────────────────────────────
 
+interface CombinedLeaderboardUser {
+  id: number;
+  username: string;
+  topScorerPick: string | null;
+}
+
 /**
  * Build a combined leaderboard merging bracket scores and group stage scores.
- * Sorted by combined score descending, then username ascending.
+ * Sort order:
+ *   1. combinedScore DESC
+ *   2. Golden Boot correctness (correct picks rank above incorrect)
+ *   3. Champion pick correctness (correct picks rank above incorrect)
+ *   4. username ASC
  * Tied users share the same rank; the next rank skips accordingly.
  * Pure function — no database access, no side effects.
  */
 export function buildCombinedLeaderboard(input: {
-  users: { id: number; username: string }[];
+  users: CombinedLeaderboardUser[];
   bracketEntries: LeaderboardEntry[];
   groupPicks: { userId: number; picks: GroupPickData[] }[];
   groupResults: GroupResultData[];
   groupConfig: GroupScoringConfig;
+  actualTopScorer: string | null;
+  actualChampion: string | null;
 }): CombinedLeaderboardEntry[] {
-  const { users, bracketEntries, groupPicks, groupResults, groupConfig } = input;
+  const {
+    users,
+    bracketEntries,
+    groupPicks,
+    groupResults,
+    groupConfig,
+    actualTopScorer,
+    actualChampion,
+  } = input;
 
-  const entries: CombinedLeaderboardEntry[] = users.map((user) => {
+  interface ScratchEntry extends CombinedLeaderboardEntry {
+    goldenBootCorrect: boolean;
+    championCorrect: boolean;
+  }
+
+  const scratch: ScratchEntry[] = users.map((user) => {
     const bracketEntry = bracketEntries.find((e) => e.userId === user.id);
     const bracketScore = bracketEntry?.score ?? 0;
 
     const userGroupPicks = groupPicks.find((gp) => gp.userId === user.id)?.picks ?? [];
     const groupScore = calculateGroupStageScore(userGroupPicks, groupResults, groupConfig);
+
+    const goldenBootCorrect =
+      actualTopScorer !== null &&
+      user.topScorerPick !== null &&
+      user.topScorerPick === actualTopScorer;
+
+    const championCorrect =
+      actualChampion !== null &&
+      bracketEntry?.championPick !== null &&
+      bracketEntry?.championPick === actualChampion;
 
     return {
       userId: user.id,
@@ -140,24 +179,38 @@ export function buildCombinedLeaderboard(input: {
       groupScore,
       combinedScore: bracketScore + groupScore,
       rank: 0,
+      goldenBootCorrect,
+      championCorrect,
     };
   });
 
-  // Sort by combined score descending, then username ascending
-  entries.sort((a, b) =>
-    b.combinedScore - a.combinedScore || a.username.localeCompare(b.username)
-  );
+  scratch.sort((a, b) => {
+    if (b.combinedScore !== a.combinedScore) return b.combinedScore - a.combinedScore;
+    if (actualTopScorer !== null && a.goldenBootCorrect !== b.goldenBootCorrect) {
+      return a.goldenBootCorrect ? -1 : 1;
+    }
+    if (actualChampion !== null && a.championCorrect !== b.championCorrect) {
+      return a.championCorrect ? -1 : 1;
+    }
+    return a.username.localeCompare(b.username);
+  });
 
-  // Assign ranks — tied entries share the same rank
-  if (entries.length > 0) {
-    entries[0].rank = 1;
-    for (let i = 1; i < entries.length; i++) {
-      entries[i].rank =
-        entries[i].combinedScore === entries[i - 1].combinedScore
-          ? entries[i - 1].rank
-          : i + 1;
+  if (scratch.length > 0) {
+    scratch[0].rank = 1;
+    for (let i = 1; i < scratch.length; i++) {
+      const prev = scratch[i - 1];
+      const curr = scratch[i];
+      const tied =
+        curr.combinedScore === prev.combinedScore &&
+        curr.goldenBootCorrect === prev.goldenBootCorrect &&
+        curr.championCorrect === prev.championCorrect;
+      curr.rank = tied ? prev.rank : i + 1;
     }
   }
 
-  return entries;
+  return scratch.map(({ goldenBootCorrect: _gb, championCorrect: _cc, ...entry }) => {
+    void _gb;
+    void _cc;
+    return entry;
+  });
 }

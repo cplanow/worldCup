@@ -5,6 +5,7 @@ export type User = {
   createdAt: string;
   bracketSubmitted: boolean;
   groupPicksSubmitted: boolean;
+  topScorerPick: string | null;
 };
 
 export type Match = {
@@ -28,6 +29,9 @@ export type TournamentConfig = {
   pointsQf: number;
   pointsSf: number;
   pointsFinal: number;
+  pointsGroupPosition: number;
+  pointsGroupPerfect: number;
+  actualTopScorer: string | null;
   createdAt: string;
 };
 
@@ -126,6 +130,21 @@ export type GroupPick = {
   groupId: number;
   firstPlace: string;
   secondPlace: string;
+  thirdPlace: string | null;
+  fourthPlace: string | null;
+  createdAt: string;
+};
+
+export type GroupRanking = {
+  first: string;
+  second: string;
+  third: string;
+  fourth: string;
+};
+
+export type ThirdPlaceAdvancer = {
+  id: number;
+  groupId: number;
   createdAt: string;
 };
 

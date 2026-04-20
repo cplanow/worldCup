@@ -3,11 +3,12 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { matches, tournamentConfig, results, groups, groupTeams, groupPicks, users } from "@/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { matches, tournamentConfig, results, groups, groupTeams, groupPicks, picks, users, thirdPlaceAdvancers } from "@/db/schema";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import type { TournamentConfig, Result } from "@/types";
 import { ROUND_NAMES, MATCHES_PER_ROUND } from "@/lib/bracket-utils";
+import { seedR32Matchups, SeedingError, type GroupSeedingInput } from "@/lib/bracket-seeding";
 
 async function verifyAdmin(): Promise<boolean> {
   const cookieStore = await cookies();
@@ -131,6 +132,9 @@ export async function getTournamentConfig(): Promise<TournamentConfig> {
     pointsQf: config.pointsQf,
     pointsSf: config.pointsSf,
     pointsFinal: config.pointsFinal,
+    pointsGroupPosition: config.pointsGroupPosition,
+    pointsGroupPerfect: config.pointsGroupPerfect,
+    actualTopScorer: config.actualTopScorer,
     createdAt: config.createdAt,
   };
 }
@@ -528,4 +532,156 @@ export async function adminResetPassword(
 
   revalidatePath("/admin");
   return { success: true, data: null };
+}
+
+export async function setActualTopScorer(
+  scorer: string | null
+): Promise<ActionResult<null>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const trimmed = scorer?.trim() || null;
+  const config = await getTournamentConfig();
+
+  await db
+    .update(tournamentConfig)
+    .set({ actualTopScorer: trimmed })
+    .where(eq(tournamentConfig.id, config.id));
+
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  return { success: true, data: null };
+}
+
+export async function setThirdPlaceAdvancers(
+  groupIds: number[]
+): Promise<ActionResult<null>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (groupIds.length !== 8) {
+    return {
+      success: false,
+      error: `Exactly 8 third-place advancers required (got ${groupIds.length})`,
+    };
+  }
+
+  const unique = new Set(groupIds);
+  if (unique.size !== 8) {
+    return { success: false, error: "Duplicate group IDs in selection" };
+  }
+
+  const existingGroups = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(inArray(groups.id, groupIds))
+    .all();
+
+  if (existingGroups.length !== 8) {
+    return { success: false, error: "One or more selected groups do not exist" };
+  }
+
+  await db.delete(thirdPlaceAdvancers);
+  await db.insert(thirdPlaceAdvancers).values(groupIds.map((groupId) => ({ groupId })));
+
+  revalidatePath("/admin");
+  return { success: true, data: null };
+}
+
+export async function getThirdPlaceAdvancers(): Promise<ActionResult<number[]>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const rows = await db.select({ groupId: thirdPlaceAdvancers.groupId }).from(thirdPlaceAdvancers).all();
+  return { success: true, data: rows.map((r) => r.groupId) };
+}
+
+export async function autoSeedR32(): Promise<ActionResult<{ created: number }>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const config = await getTournamentConfig();
+  if (config.isLocked) {
+    return { success: false, error: "Cannot auto-seed while bracket is locked" };
+  }
+
+  const existingResults = await db.select().from(results).all();
+  if (existingResults.length > 0) {
+    return {
+      success: false,
+      error: "Cannot auto-seed after match results have been entered",
+    };
+  }
+
+  const allGroups = await db.select().from(groups).orderBy(asc(groups.name)).all();
+  const allTeams = await db.select().from(groupTeams).all();
+  const advancerRows = await db.select().from(thirdPlaceAdvancers).all();
+  const advancerGroupIds = new Set(advancerRows.map((r) => r.groupId));
+
+  if (allGroups.length !== 12) {
+    return {
+      success: false,
+      error: `Need all 12 groups before auto-seeding (found ${allGroups.length})`,
+    };
+  }
+
+  const seedingInput: GroupSeedingInput[] = allGroups.map((g) => {
+    const teams = allTeams.filter((t) => t.groupId === g.id);
+    const first = teams.find((t) => t.finalPosition === 1)?.teamName ?? "";
+    const second = teams.find((t) => t.finalPosition === 2)?.teamName ?? "";
+    const third = teams.find((t) => t.finalPosition === 3)?.teamName ?? "";
+    return {
+      name: g.name,
+      first,
+      second,
+      third,
+      thirdAdvances: advancerGroupIds.has(g.id),
+    };
+  });
+
+  let seeded;
+  try {
+    seeded = seedR32Matchups(seedingInput);
+  } catch (err) {
+    if (err instanceof SeedingError) {
+      return { success: false, error: err.message };
+    }
+    throw err;
+  }
+
+  const existingR32 = await db.select().from(matches).where(eq(matches.round, 1)).all();
+  const r32Ids = existingR32.map((m) => m.id);
+  if (r32Ids.length > 0) {
+    await db.delete(picks).where(inArray(picks.matchId, r32Ids));
+    await db.delete(matches).where(inArray(matches.id, r32Ids));
+  }
+
+  await db.insert(matches).values(
+    seeded.map((m) => ({
+      teamA: m.teamA,
+      teamB: m.teamB,
+      round: 1,
+      position: m.position,
+    }))
+  );
+
+  const existingLaterRounds = await db.select().from(matches).where(eq(matches.round, 2)).all();
+  if (existingLaterRounds.length === 0) {
+    const placeholders: { teamA: string; teamB: string; round: number; position: number }[] = [];
+    for (let round = 2; round <= 5; round++) {
+      const count = MATCHES_PER_ROUND[round];
+      for (let pos = 1; pos <= count; pos++) {
+        placeholders.push({ teamA: "", teamB: "", round, position: pos });
+      }
+    }
+    await db.insert(matches).values(placeholders);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/bracket");
+  return { success: true, data: { created: seeded.length } };
 }

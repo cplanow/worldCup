@@ -253,6 +253,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-02-17: Story 1.1 implementation — scaffolded Next.js 16 project with all tooling, dependencies, and project structure. Pushed to GitHub. Vercel deployment pending user action.
+- 2026-04-20: **Deployment migrated off Vercel.** App now self-hosted via Docker on sparta (`10.0.20.22`), exposed at `https://worldcup.chris.planow.com` on port 3002. Turso auth token rotated at the same time. AC5 of this story is superseded — see `docker-compose.yml` at repo root and `worldcup-app/Dockerfile` for the new deploy pipeline. No `vercel.json`, `.vercel` directory, or `@vercel/*` package dependencies remain in the codebase.
 
 ### File List
 

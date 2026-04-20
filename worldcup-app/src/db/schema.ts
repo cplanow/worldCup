@@ -13,6 +13,7 @@ export const users = sqliteTable("users", {
   groupPicksSubmitted: integer("group_picks_submitted", { mode: "boolean" })
     .notNull()
     .default(false),
+  topScorerPick: text("top_scorer_pick"),
 });
 
 export const tournamentConfig = sqliteTable("tournament_config", {
@@ -21,11 +22,14 @@ export const tournamentConfig = sqliteTable("tournament_config", {
   groupStageLocked: integer("group_stage_locked", { mode: "boolean" }).notNull().default(false),
   pointsGroupAdvance: integer("points_group_advance").notNull().default(2),
   pointsGroupExact: integer("points_group_exact").notNull().default(1),
-  pointsR32: integer("points_r32").notNull().default(1),
-  pointsR16: integer("points_r16").notNull().default(2),
-  pointsQf: integer("points_qf").notNull().default(4),
-  pointsSf: integer("points_sf").notNull().default(8),
-  pointsFinal: integer("points_final").notNull().default(16),
+  pointsR32: integer("points_r32").notNull().default(2),
+  pointsR16: integer("points_r16").notNull().default(4),
+  pointsQf: integer("points_qf").notNull().default(8),
+  pointsSf: integer("points_sf").notNull().default(16),
+  pointsFinal: integer("points_final").notNull().default(32),
+  pointsGroupPosition: integer("points_group_position").notNull().default(2),
+  pointsGroupPerfect: integer("points_group_perfect").notNull().default(5),
+  actualTopScorer: text("actual_top_scorer"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
 
@@ -81,7 +85,15 @@ export const groupPicks = sqliteTable("group_picks", {
   groupId: integer("group_id").notNull().references(() => groups.id),
   firstPlace: text("first_place").notNull(),
   secondPlace: text("second_place").notNull(),
+  thirdPlace: text("third_place"),
+  fourthPlace: text("fourth_place"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [
   uniqueIndex("idx_group_picks_user_group").on(table.userId, table.groupId),
 ]);
+
+export const thirdPlaceAdvancers = sqliteTable("third_place_advancers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  groupId: integer("group_id").notNull().references(() => groups.id).unique(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+});

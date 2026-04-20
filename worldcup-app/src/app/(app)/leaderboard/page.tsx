@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users, picks, matches, results, tournamentConfig, groupPicks, groupTeams } from "@/db/schema";
 import { asc } from "drizzle-orm";
-import { buildLeaderboardEntries, getPointsPerRound, applyTiebreakers } from "@/lib/scoring-engine";
-import { calculateGroupStageScore } from "@/lib/group-scoring-engine";
+import { buildLeaderboardEntries, getPointsPerRound } from "@/lib/scoring-engine";
+import { buildCombinedLeaderboard } from "@/lib/group-scoring-engine";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { LockMessage } from "@/components/LockMessage";
 
@@ -32,9 +32,9 @@ export default async function LeaderboardPage({
 
   const pointsPerRound = config
     ? getPointsPerRound(config)
-    : { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+    : { 1: 2, 2: 4, 3: 8, 4: 16, 5: 32 };
 
-  const baseEntries = buildLeaderboardEntries({
+  const bracketEntries = buildLeaderboardEntries({
     users: allUsers,
     allPicks,
     results: allResults,
@@ -42,13 +42,6 @@ export default async function LeaderboardPage({
     pointsPerRound,
   });
 
-  const entries = applyTiebreakers(baseEntries, {
-    allPicks,
-    results: allResults,
-    matches: allMatches,
-  });
-
-  // Build group results from groupTeams that have finalPosition set
   const groupResultsMap = new Map<number, { teamName: string; finalPosition: number }[]>();
   for (const gt of allGroupTeams) {
     if (gt.finalPosition != null) {
@@ -59,35 +52,53 @@ export default async function LeaderboardPage({
   const groupResults = Array.from(groupResultsMap.entries()).map(([groupId, teams]) => ({ groupId, teams }));
 
   const groupConfig = {
-    pointsGroupAdvance: config?.pointsGroupAdvance ?? 2,
-    pointsGroupExact: config?.pointsGroupExact ?? 1,
+    pointsGroupPosition: config?.pointsGroupPosition ?? 2,
+    pointsGroupPerfect: config?.pointsGroupPerfect ?? 5,
   };
 
-  // Build combined entries
-  const combinedEntries = entries.map((entry) => {
-    const userGroupPicks = allGroupPicks
-      .filter((p) => p.userId === entry.userId)
-      .map((p) => ({ groupId: p.groupId, firstPlace: p.firstPlace, secondPlace: p.secondPlace }));
+  const userGroupPicks = allUsers.map((u) => ({
+    userId: u.id,
+    picks: allGroupPicks
+      .filter((p) => p.userId === u.id)
+      .map((p) => ({
+        groupId: p.groupId,
+        firstPlace: p.firstPlace,
+        secondPlace: p.secondPlace,
+        thirdPlace: p.thirdPlace,
+        fourthPlace: p.fourthPlace,
+      })),
+  }));
 
-    const groupScore = calculateGroupStageScore(userGroupPicks, groupResults, groupConfig);
+  const finalMatch = allMatches.find((m) => m.round === 5 && m.position === 1);
+  const finalResult = finalMatch ? allResults.find((r) => r.matchId === finalMatch.id) : null;
+  const actualChampion = finalResult?.winner ?? null;
 
-    return {
-      ...entry,
-      groupScore,
-      bracketScore: entry.score,
-      score: entry.score + groupScore,
-    };
+  const combinedEntries = buildCombinedLeaderboard({
+    users: allUsers.map((u) => ({ id: u.id, username: u.username, topScorerPick: u.topScorerPick })),
+    bracketEntries,
+    groupPicks: userGroupPicks,
+    groupResults,
+    groupConfig,
+    actualTopScorer: config?.actualTopScorer ?? null,
+    actualChampion,
   });
 
-  // Re-sort by combined score and re-rank
-  combinedEntries.sort((a, b) => b.score - a.score || a.username.localeCompare(b.username));
-  let currentRank = 1;
-  for (let i = 0; i < combinedEntries.length; i++) {
-    if (i > 0 && combinedEntries[i].score < combinedEntries[i - 1].score) {
-      currentRank = i + 1;
-    }
-    combinedEntries[i].rank = currentRank;
-  }
+  const bracketByUser = new Map(bracketEntries.map((e) => [e.userId, e]));
+  const tableEntries = combinedEntries.map((entry) => {
+    const bracket = bracketByUser.get(entry.userId);
+    return {
+      userId: entry.userId,
+      username: entry.username,
+      score: entry.combinedScore,
+      maxPossible: (bracket?.maxPossible ?? 0) + entry.groupScore,
+      championPick: bracket?.championPick ?? null,
+      isChampionEliminated: bracket?.isChampionEliminated ?? false,
+      isEliminated: bracket?.isEliminated ?? false,
+      rank: entry.rank,
+      groupScore: entry.groupScore,
+      bracketScore: entry.bracketScore,
+    };
+  });
 
   return (
     <div className="px-4 py-6">
@@ -97,7 +108,7 @@ export default async function LeaderboardPage({
           <LockMessage />
         </div>
       )}
-      <LeaderboardTable entries={combinedEntries} currentUsername={username} />
+      <LeaderboardTable entries={tableEntries} currentUsername={username} />
     </div>
   );
 }

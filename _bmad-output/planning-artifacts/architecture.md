@@ -14,6 +14,14 @@ user_name: 'Chris'
 date: '2026-02-17'
 ---
 
+> **⚠️ Deployment Superseded (2026-04-20)**
+>
+> All references below to **Vercel** (hosting, CI/CD, `.vercel/` directory, environment dashboard, serverless functions, Vercel logs) are **historical** and no longer reflect the running system.
+>
+> As of 2026-04-20, the app is **self-hosted via Docker** on sparta (`10.0.20.22`) and exposed at `https://worldcup.chris.planow.com` on port `3002`. Deploy pipeline is: `git push` → manual SSH to sparta → `docker compose up -d --build`. No `vercel.json`, `.vercel/` directory, `@vercel/*` dependencies, or Vercel dashboard config remain. See `docker-compose.yml` at repo root and `worldcup-app/Dockerfile`.
+>
+> Architectural decisions in the body below remain accurate for **application-level** choices (Next.js 16, Drizzle, Turso, Server Actions, scoring engine design). Only the **deployment/CI/hosting layer** has changed.
+
 # Architecture Decision Document
 
 _This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._

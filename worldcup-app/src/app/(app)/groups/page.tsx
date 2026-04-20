@@ -30,6 +30,8 @@ export default async function GroupsPage() {
     groupId: p.groupId,
     firstPlace: p.firstPlace,
     secondPlace: p.secondPlace,
+    thirdPlace: p.thirdPlace,
+    fourthPlace: p.fourthPlace,
   }));
 
   return (
@@ -42,6 +44,7 @@ export default async function GroupsPage() {
           userId={user.id}
           groups={groupsWithTeams}
           existingPicks={existingPicks}
+          initialTopScorer={user.topScorerPick}
           isSubmitted={user.groupPicksSubmitted}
           isLocked={config?.groupStageLocked ?? false}
         />

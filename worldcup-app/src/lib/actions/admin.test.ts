@@ -268,11 +268,17 @@ describe("deleteMatchup", () => {
 const mockConfigRow = {
   id: 1,
   isLocked: false,
-  pointsR32: 1,
-  pointsR16: 2,
-  pointsQf: 4,
-  pointsSf: 8,
-  pointsFinal: 16,
+  groupStageLocked: false,
+  pointsGroupAdvance: 2,
+  pointsGroupExact: 1,
+  pointsR32: 2,
+  pointsR16: 4,
+  pointsQf: 8,
+  pointsSf: 16,
+  pointsFinal: 32,
+  pointsGroupPosition: 2,
+  pointsGroupPerfect: 5,
+  actualTopScorer: null,
   createdAt: "2026-02-18T00:00:00.000Z",
 };
 
