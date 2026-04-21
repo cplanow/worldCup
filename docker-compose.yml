@@ -32,9 +32,11 @@ services:
     container_name: worldcup-app
     restart: unless-stopped
     ports:
-      # Bind to loopback only — Caddy proxies from 127.0.0.1:3002.
-      # Prevents plaintext-HTTP access over the LAN that would bypass TLS.
-      - "127.0.0.1:3002:3000"
+      # Reverse proxy (Caddy) lives on citadel (10.0.20.20), a different host
+      # from sparta. Cross-host proxying needs LAN reachability, so binding
+      # to 0.0.0.0 is required. Edge security is enforced at the homelab
+      # firewall (no port forward for 3002).
+      - "3002:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
