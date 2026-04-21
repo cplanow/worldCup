@@ -20,12 +20,21 @@ vi.mock("@/lib/session", () => {
     const admin = process.env.ADMIN_USERNAME?.toLowerCase();
     return !!admin && !!name && name.toLowerCase() === admin;
   };
+  const requireUser = vi.fn();
   return {
     getSession,
     isAdminUsername,
-    __sessionMocks: { save, destroy, sessionState },
+    requireUser,
+    __sessionMocks: { save, destroy, sessionState, requireUser },
   };
 });
+
+// Mock next/headers — the rate-limit helper reads it to fingerprint the caller.
+vi.mock("next/headers", () => ({
+  headers: vi.fn(async () => ({
+    get: (_name: string) => null,
+  })),
+}));
 
 vi.mock("@/db", () => {
   const mockGet = vi.fn();
@@ -56,6 +65,13 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("@/lib/password", () => ({
   hashPassword: vi.fn().mockResolvedValue("salt:hash"),
   verifyPassword: vi.fn().mockResolvedValue(true),
+  validatePasswordStrength: vi.fn((password: string) => {
+    if (password.length < 10) {
+      return { valid: false, reason: "Password must be at least 10 characters" };
+    }
+    return { valid: true };
+  }),
+  MIN_PASSWORD_LENGTH: 10,
 }));
 
 import { registerUser, loginUser, logoutUser } from "@/lib/actions/auth";

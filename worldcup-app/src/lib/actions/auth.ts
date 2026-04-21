@@ -4,12 +4,11 @@ import { db } from "@/db";
 import { users, tournamentConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
-import { hashPassword, verifyPassword } from "@/lib/password";
+import { hashPassword, verifyPassword, validatePasswordStrength } from "@/lib/password";
 import { getSession, isAdminUsername } from "@/lib/session";
 import { checkRateLimit, getClientIp, AUTH_LIMITS } from "@/lib/rate-limit";
 
 const MAX_USERNAME_LENGTH = 30;
-const MIN_PASSWORD_LENGTH = 10;
 
 function rateLimitMessage(retryAfterMs: number): string {
   const seconds = Math.ceil(retryAfterMs / 1000);
@@ -50,11 +49,9 @@ export async function registerUser(
     };
   }
 
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return {
-      success: false,
-      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-    };
+  const strength = validatePasswordStrength(password);
+  if (!strength.valid) {
+    return { success: false, error: strength.reason ?? "Password is too weak" };
   }
 
   // C4 fix: the admin username cannot be claimed via self-registration.
