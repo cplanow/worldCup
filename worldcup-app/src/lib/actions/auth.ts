@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword, validatePasswordStrength } from "@/lib/pa
 import { getSession, getSessionUser, isAdminUsername } from "@/lib/session";
 import { checkRateLimit, getClientIp, AUTH_LIMITS } from "@/lib/rate-limit";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { logAudit } from "@/lib/audit-log";
 
 const MAX_USERNAME_LENGTH = 30;
 
@@ -18,10 +19,11 @@ function rateLimitMessage(retryAfterMs: number): string {
   return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
 }
 
-async function createSession(userId: number, username: string) {
+async function createSession(userId: number, username: string, sessionVersion: number) {
   const session = await getSession();
   session.userId = userId;
   session.username = username;
+  session.sessionVersion = sessionVersion;
   await session.save();
 }
 
@@ -92,7 +94,8 @@ export async function registerUser(
     const config = await db.select().from(tournamentConfig).get();
     const isLocked = config?.isLocked ?? false;
 
-    await createSession(result[0].id, trimmed);
+    // Fresh users have session_version = 1 (schema default).
+    await createSession(result[0].id, trimmed, 1);
 
     return {
       success: true,
@@ -160,7 +163,7 @@ export async function loginUser(
     const config = await db.select().from(tournamentConfig).get();
     const isLocked = config?.isLocked ?? false;
 
-    await createSession(user.id, user.username);
+    await createSession(user.id, user.username, user.sessionVersion);
 
     return {
       success: true,
@@ -237,11 +240,21 @@ export async function changePassword(data: {
       })
       .where(eq(users.id, user.id));
 
-    // Re-save the session so this browser stays signed in.
+    // Re-save the session with the NEW session_version so this browser
+    // stays signed in while other devices (still carrying the old version)
+    // are invalidated on their next request.
+    const newVersion = user.sessionVersion + 1;
     const session = await getSession();
     session.userId = user.id;
     session.username = user.username;
+    session.sessionVersion = newVersion;
     await session.save();
+
+    await logAudit({
+      actorUserId: user.id,
+      actorUsername: user.username,
+      action: "auth.password_changed",
+    });
 
     return { success: true, data: null };
   } catch (error) {
@@ -327,13 +340,14 @@ export async function consumePasswordResetToken(data: {
     }
 
     const hash = await hashPassword(newPassword);
+    const newVersion = user.sessionVersion + 1;
 
     await db
       .update(users)
       .set({
         passwordHash: hash,
         passwordChangedAt: new Date().toISOString(),
-        sessionVersion: user.sessionVersion + 1,
+        sessionVersion: newVersion,
         resetTokenHash: null,
         resetTokenExpiresAt: null,
       })
@@ -342,7 +356,13 @@ export async function consumePasswordResetToken(data: {
     const config = await db.select().from(tournamentConfig).get();
     const isLocked = config?.isLocked ?? false;
 
-    await createSession(user.id, user.username);
+    await createSession(user.id, user.username, newVersion);
+
+    await logAudit({
+      actorUserId: user.id,
+      actorUsername: user.username,
+      action: "auth.password_reset_consumed",
+    });
 
     return {
       success: true,

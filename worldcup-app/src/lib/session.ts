@@ -8,6 +8,11 @@ import { eq } from "drizzle-orm";
 export interface SessionData {
   userId?: number;
   username?: string;
+  // Snapshot of users.session_version at the time this session was issued.
+  // If the user's DB row has a higher version later (e.g. after a password
+  // change), this session is stale and getSessionUser treats it as invalid —
+  // other devices get force-logged-out on the next request.
+  sessionVersion?: number;
 }
 
 // Minimum 32 chars — iron-session uses this as an AES-256 key.
@@ -63,8 +68,13 @@ export async function getSessionUser() {
     .where(eq(users.id, session.userId))
     .get();
 
-  // If the DB row is gone or the username changed, treat the session as invalid.
-  if (!user || user.username !== session.username) return null;
+  // Invalidate if: user is gone, username changed, or session was issued
+  // against an older session_version (M3 — password change / forced logout).
+  if (!user) return null;
+  if (user.username !== session.username) return null;
+  if (session.sessionVersion !== undefined && session.sessionVersion !== user.sessionVersion) {
+    return null;
+  }
   return user;
 }
 

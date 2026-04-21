@@ -10,6 +10,15 @@ import type { TournamentConfig, Result } from "@/types";
 import { ROUND_NAMES, MATCHES_PER_ROUND } from "@/lib/bracket-utils";
 import { seedR32Matchups, SeedingError, type GroupSeedingInput } from "@/lib/bracket-seeding";
 import { getSessionUser, isAdminUsername } from "@/lib/session";
+import { logAudit } from "@/lib/audit-log";
+
+async function getAdminActor() {
+  const user = await getSessionUser();
+  return {
+    actorUserId: user?.id ?? null,
+    actorUsername: user?.username ?? null,
+  };
+}
 
 async function verifyAdmin(): Promise<boolean> {
   const user = await getSessionUser();
@@ -158,6 +167,12 @@ export async function toggleLock(
     .set({ isLocked: locked })
     .where(eq(tournamentConfig.id, config.id));
 
+  await logAudit({
+    ...(await getAdminActor()),
+    action: "admin.toggle_bracket_lock",
+    payload: { isLocked: locked },
+  });
+
   revalidatePath("/admin");
   return { success: true, data: { isLocked: locked } };
 }
@@ -277,6 +292,12 @@ export async function enterResult(data: {
   // Advance winner to next round
   await advanceWinner(match.round, match.position, data.winner);
 
+  await logAudit({
+    ...(await getAdminActor()),
+    action: "admin.enter_result",
+    payload: { matchId: data.matchId, winner: data.winner, round: match.round },
+  });
+
   revalidatePath("/admin");
   revalidatePath("/leaderboard");
   revalidatePath("/bracket");
@@ -354,6 +375,17 @@ export async function correctResult(data: {
       }
     }
   }
+
+  await logAudit({
+    ...(await getAdminActor()),
+    action: "admin.correct_result",
+    payload: {
+      matchId: data.matchId,
+      previousWinner: existingResult.winner,
+      newWinner: data.winner,
+      round: match.round,
+    },
+  });
 
   revalidatePath("/admin");
   revalidatePath("/leaderboard");
@@ -516,6 +548,12 @@ export async function toggleGroupStageLock(
     .set({ groupStageLocked: locked })
     .where(eq(tournamentConfig.id, config.id));
 
+  await logAudit({
+    ...(await getAdminActor()),
+    action: "admin.toggle_group_stage_lock",
+    payload: { groupStageLocked: locked },
+  });
+
   revalidatePath("/admin");
   return { success: true, data: { groupStageLocked: locked } };
 }
@@ -560,7 +598,12 @@ export async function adminGenerateResetToken(
     })
     .where(eq(users.id, userId));
 
-  // TODO(audit): log admin_reset_token_generated action
+  await logAudit({
+    ...(await getAdminActor()),
+    action: "admin.generate_reset_token",
+    payload: { targetUserId: userId, targetUsername: user.username, expiresAt },
+  });
+
   revalidatePath("/admin");
   return { success: true, data: { token, expiresAt } };
 }
