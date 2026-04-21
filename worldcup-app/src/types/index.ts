@@ -1,13 +1,3 @@
-export type User = {
-  id: number;
-  username: string;
-  passwordHash: string | null;
-  createdAt: string;
-  bracketSubmitted: boolean;
-  groupPicksSubmitted: boolean;
-  topScorerPick: string | null;
-};
-
 export type Match = {
   id: number;
   teamA: string;
@@ -81,11 +71,6 @@ export interface MaxPointsInput {
   currentScore: number;
 }
 
-export interface EliminationInput {
-  maxPossible: number;
-  leaderScore: number;
-}
-
 export interface LeaderboardEntry {
   userId: number;
   username: string;
@@ -110,20 +95,6 @@ export interface PlayerScore {
   score: number;
 }
 
-export type Group = {
-  id: number;
-  name: string;
-  createdAt: string;
-};
-
-export type GroupTeam = {
-  id: number;
-  groupId: number;
-  teamName: string;
-  finalPosition: number | null;
-  createdAt: string;
-};
-
 export type GroupPick = {
   id: number;
   userId: number;
@@ -133,22 +104,4 @@ export type GroupPick = {
   thirdPlace: string | null;
   fourthPlace: string | null;
   createdAt: string;
-};
-
-export type GroupRanking = {
-  first: string;
-  second: string;
-  third: string;
-  fourth: string;
-};
-
-export type ThirdPlaceAdvancer = {
-  id: number;
-  groupId: number;
-  createdAt: string;
-};
-
-export type CombinedLeaderboardEntry = LeaderboardEntry & {
-  groupScore: number;
-  bracketScore: number;
 };

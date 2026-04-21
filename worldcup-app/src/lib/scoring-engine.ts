@@ -1,7 +1,5 @@
 import type { ScoreInput, PlayerScore, MaxPointsInput, LeaderboardEntry } from "@/types";
 
-export type { ScoreInput, PlayerScore, MaxPointsInput, LeaderboardEntry };
-
 /**
  * Calculate a single participant's score.
  * Pure function — no database access, no side effects.
