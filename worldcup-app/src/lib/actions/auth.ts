@@ -11,6 +11,14 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { logAudit } from "@/lib/audit-log";
 
 const MAX_USERNAME_LENGTH = 30;
+const MIN_USERNAME_LENGTH = 3;
+// L1: constrain usernames to a narrow ASCII set. Blocks emoji, zero-width
+// joiners, and Cyrillic homoglyph attacks (confusability) without being
+// unduly strict on real names. Allows letters (lowercased by caller),
+// digits, and the safe separators `.`, `_`, `-`.
+const USERNAME_REGEX = /^[a-z0-9._-]{3,30}$/;
+const USERNAME_FORMAT_ERROR =
+  "Username must be 3-30 characters, letters/numbers/._- only";
 
 function rateLimitMessage(retryAfterMs: number): string {
   const seconds = Math.ceil(retryAfterMs / 1000);
@@ -50,6 +58,10 @@ export async function registerUser(
       success: false,
       error: `Username must be ${MAX_USERNAME_LENGTH} characters or less`,
     };
+  }
+
+  if (trimmed.length < MIN_USERNAME_LENGTH || !USERNAME_REGEX.test(trimmed)) {
+    return { success: false, error: USERNAME_FORMAT_ERROR };
   }
 
   const strength = validatePasswordStrength(password);
@@ -123,6 +135,13 @@ export async function loginUser(
   const trimmed = username.trim().toLowerCase();
 
   if (!trimmed) {
+    return { success: false, error: "Invalid username or password" };
+  }
+
+  // L1: mirror the registration regex. Reject malformed usernames silently
+  // with the generic error so attackers can't distinguish "bad format" from
+  // "wrong password" — keeps username enumeration attacks symmetric.
+  if (!USERNAME_REGEX.test(trimmed)) {
     return { success: false, error: "Invalid username or password" };
   }
 

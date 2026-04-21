@@ -182,6 +182,55 @@ describe("registerUser", () => {
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.username).toBe("mixedcase");
   });
+
+  describe("username format regex (L1)", () => {
+    const FORMAT_ERROR =
+      "Username must be 3-30 characters, letters/numbers/._- only";
+
+    it.each([
+      ["cplanow"],
+      ["user_1"],
+      ["a.b"],
+    ])("accepts valid username %s", async (name) => {
+      const { mockGet, mockReturning } = await getDbMocks();
+      mockGet.mockResolvedValueOnce(undefined);
+      mockReturning.mockResolvedValueOnce([{ id: 1, username: name }]);
+      mockGet.mockResolvedValueOnce({ isLocked: false });
+
+      const result = await registerUser(name, "password12");
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects username shorter than 3 characters", async () => {
+      const result = await registerUser("Ab", "password12");
+      expect(result).toEqual({ success: false, error: FORMAT_ERROR });
+    });
+
+    it("rejects username over 30 chars before regex check", async () => {
+      // Length cap runs first and uses its own message.
+      const result = await registerUser("x".repeat(31), "password12");
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toMatch(/30 characters or less/);
+      }
+    });
+
+    it("rejects emoji trophy character", async () => {
+      const result = await registerUser("\u{1F3C6}", "password12");
+      expect(result).toEqual({ success: false, error: FORMAT_ERROR });
+    });
+
+    it("rejects usernames containing @ (e.g. email-shaped)", async () => {
+      const result = await registerUser("chris@gmail.com", "password12");
+      expect(result).toEqual({ success: false, error: FORMAT_ERROR });
+    });
+
+    it("rejects Cyrillic homoglyph (looks like ASCII 'a')", async () => {
+      // Cyrillic small letter a (U+0430) — visually identical to Latin 'a'
+      const result = await registerUser("\u0430dmin", "password12");
+      expect(result).toEqual({ success: false, error: FORMAT_ERROR });
+    });
+  });
 });
 
 describe("loginUser", () => {
@@ -236,6 +285,13 @@ describe("loginUser", () => {
     expect(s.save).toHaveBeenCalled();
     expect(s.sessionState.userId).toBe(7);
     expect(s.sessionState.username).toBe("user1");
+  });
+
+  it("rejects malformed username silently with generic error (L1)", async () => {
+    // Username fails regex. Should hit generic error without leaking format
+    // details or distinguishing from a wrong-password attempt.
+    const result = await loginUser("chris@gmail.com", "password12");
+    expect(result).toEqual({ success: false, error: "Invalid username or password" });
   });
 
   it("marks admin when username matches ADMIN_USERNAME", async () => {
