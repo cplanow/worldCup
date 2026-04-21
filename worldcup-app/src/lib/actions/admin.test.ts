@@ -107,6 +107,7 @@ vi.mock("drizzle-orm", () => ({
 
 import {
   setupMatchup,
+  setupGroup,
   getMatches,
   deleteMatchup,
   getTournamentConfig,
@@ -627,6 +628,51 @@ describe("enterResult", () => {
     await enterResult({ matchId: 1, winner: "Brazil" });
     // Position 1 (odd) → teamA slot of next match
     expect(mockSet).toHaveBeenCalledWith({ teamA: "Brazil" });
+  });
+});
+
+describe("setupGroup (L7 name regex)", () => {
+  const validTeams = ["Brazil", "Croatia", "Cameroon", "Serbia"];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin", async () => {
+    mockNonAdmin();
+    const r = await setupGroup({ name: "A", teams: validTeams });
+    expect(r).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("rejects empty name before regex check", async () => {
+    mockAdmin();
+    const r = await setupGroup({ name: "   ", teams: validTeams });
+    expect(r).toEqual({ success: false, error: "Group name is required" });
+  });
+
+  it.each([
+    ["AA"],
+    ["a"],
+    ["Group A"],
+    ["M"],
+    ["1"],
+  ])("rejects invalid group name %s", async (name) => {
+    mockAdmin();
+    const r = await setupGroup({ name, teams: validTeams });
+    expect(r).toEqual({
+      success: false,
+      error: "Group name must be a single letter A through L",
+    });
+  });
+
+  it.each([["A"], ["L"]])("accepts valid group letter %s", async (name) => {
+    mockAdmin();
+    const { mockGet, mockReturning } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined); // no existing group
+    mockReturning.mockResolvedValueOnce([{ id: 1, name }]);
+    const r = await setupGroup({ name, teams: validTeams });
+    expect(r).toEqual({ success: true, data: { groupId: 1 } });
   });
 });
 

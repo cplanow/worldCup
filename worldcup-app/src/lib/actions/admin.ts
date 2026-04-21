@@ -429,6 +429,15 @@ export async function setupGroup(data: {
     return { success: false, error: "Group name is required" };
   }
 
+  // L7: seedR32Matchups assumes single-letter group names A-L. Entering
+  // "Group A" instead of "A" would silently break auto-seeding later.
+  if (!/^[A-L]$/.test(name.trim())) {
+    return {
+      success: false,
+      error: "Group name must be a single letter A through L",
+    };
+  }
+
   if (teams.length !== 4) {
     return { success: false, error: "Exactly 4 teams are required" };
   }
