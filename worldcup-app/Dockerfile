@@ -17,16 +17,11 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Turso is reached during `next build`'s data-collection phase for any
-# route that queries the DB at module load (e.g. /bracket/[username]
-# which calls db.select() directly). Pass these as build args so the
-# builder stage can reach Turso. These values do NOT end up in the
-# final runner image (they're only in the builder stage) but they DO
-# appear in build logs — acceptable for a trusted build host.
-ARG TURSO_CONNECTION_URL
-ARG TURSO_AUTH_TOKEN
-ENV TURSO_CONNECTION_URL=${TURSO_CONNECTION_URL}
-ENV TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+# H6: No build-time Turso access. Every route uses cookies() via
+# requireSessionOrRedirect/requireUser, so Next.js marks all 9 routes
+# dynamic (ƒ) and skips prerender data collection. This removes the
+# former TURSO_CONNECTION_URL / TURSO_AUTH_TOKEN build args that leaked
+# the token into build logs.
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

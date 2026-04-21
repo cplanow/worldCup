@@ -22,12 +22,8 @@ services:
     build:
       context: ./worldcup-app
       dockerfile: Dockerfile
-      args:
-        # Next.js collects page data at build time for some routes
-        # (e.g. /bracket/[username]) that query Turso at module load.
-        # Pass creds to the build stage so build can reach the DB.
-        TURSO_CONNECTION_URL: ${TURSO_CONNECTION_URL}
-        TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
+      # H6: no build args — all routes are dynamic and the container never
+      # reads the DB at build time. Turso creds are runtime-only (below).
     image: worldcup-app:local
     container_name: worldcup-app
     restart: unless-stopped
