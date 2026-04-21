@@ -17,8 +17,11 @@ All notable changes to the worldCup prediction pool are documented here.
   errors to prevent enumeration of takeoverable accounts.
 - 60-char cap on admin-entered team names; 100-char cap on top-scorer
   picks.
-- Bound Docker container port to `127.0.0.1:3002:3000` so Caddy is the
-  only path to the app (no direct plaintext HTTP on the LAN).
+- ~~Bound Docker container port to `127.0.0.1:3002:3000`~~ **Reverted
+  (`147fd3e`):** M5 assumed Caddy was co-located on sparta. In this
+  homelab Caddy lives on citadel (`10.0.20.20`) and needs LAN
+  reachability to sparta:3002. Loopback binding broke the reverse
+  proxy. Edge exposure is controlled at the homelab firewall instead.
 
 **Phase 2** (`310c98d`) — signed-session auth rewrite:
 - Replaced the unsigned `username=<literal>` cookie with an iron-session
