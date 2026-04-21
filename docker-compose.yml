@@ -30,7 +30,9 @@ services:
     container_name: worldcup-app
     restart: unless-stopped
     ports:
-      - "3002:3000"
+      # Bind to loopback only — Caddy proxies from 127.0.0.1:3002.
+      # Prevents plaintext-HTTP access over the LAN that would bypass TLS.
+      - "127.0.0.1:3002:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"

@@ -4,6 +4,8 @@
  * Passwords are stored as "salt:hash" where both parts are hex-encoded.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 const ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const HASH_BITS = 256;
@@ -69,10 +71,13 @@ export async function verifyPassword(
   storedHash: string
 ): Promise<boolean> {
   const [saltHex, hashHex] = storedHash.split(":");
+  if (!saltHex || !hashHex) return false;
+
   const salt = fromHex(saltHex);
-
   const hashBuffer = await deriveKey(password, salt);
-  const derivedHex = toHex(hashBuffer);
+  const derivedBytes = new Uint8Array(hashBuffer);
+  const storedBytes = fromHex(hashHex);
 
-  return derivedHex === hashHex;
+  if (derivedBytes.length !== storedBytes.length) return false;
+  return timingSafeEqual(derivedBytes, storedBytes);
 }

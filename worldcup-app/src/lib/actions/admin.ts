@@ -34,6 +34,10 @@ export async function setupMatchup(data: {
     return { success: false, error: "Both team names are required" };
   }
 
+  if (teamA.trim().length > 60 || teamB.trim().length > 60) {
+    return { success: false, error: "Team names must be 60 characters or less" };
+  }
+
   if (!Number.isInteger(position) || position < 1 || position > 16) {
     return { success: false, error: "Position must be between 1 and 16" };
   }
@@ -404,6 +408,10 @@ export async function setupGroup(data: {
     return { success: false, error: "All team names must be non-empty" };
   }
 
+  if (teams.some((t) => t.trim().length > 60)) {
+    return { success: false, error: "Team names must be 60 characters or less" };
+  }
+
   // Check if group name already exists -> upsert
   const existing = await db
     .select()
@@ -542,6 +550,9 @@ export async function setActualTopScorer(
   }
 
   const trimmed = scorer?.trim() || null;
+  if (trimmed !== null && trimmed.length > 100) {
+    return { success: false, error: "Top scorer must be 100 characters or less" };
+  }
   const config = await getTournamentConfig();
 
   await db

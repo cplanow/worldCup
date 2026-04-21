@@ -112,6 +112,9 @@ export async function saveTopScorerPick(data: {
   if (!trimmed) {
     return { success: false, error: "Top scorer pick cannot be empty" };
   }
+  if (trimmed.length > 100) {
+    return { success: false, error: "Top scorer pick must be 100 characters or less" };
+  }
 
   await db.update(users).set({ topScorerPick: trimmed }).where(eq(users.id, data.userId));
 

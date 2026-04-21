@@ -164,7 +164,7 @@ describe("registerUser", () => {
 
     expect(cookieSet).toHaveBeenCalledWith("username", "newuser", {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30,
     });
@@ -326,7 +326,7 @@ describe("loginUser", () => {
 
     expect(cookieSet).toHaveBeenCalledWith("username", "user1", {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30,
     });
@@ -388,7 +388,7 @@ describe("setPassword", () => {
     const result = await setPassword("nonexistent", "password123");
     expect(result).toEqual({
       success: false,
-      error: "User not found",
+      error: "Unable to set password",
     });
   });
 
@@ -404,7 +404,7 @@ describe("setPassword", () => {
     const result = await setPassword("user1", "password123");
     expect(result).toEqual({
       success: false,
-      error: "Password already set",
+      error: "Unable to set password",
     });
   });
 

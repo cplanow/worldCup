@@ -14,7 +14,7 @@ async function setSessionCookie(username: string) {
   const cookieStore = await cookies();
   cookieStore.set("username", username, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 30,
   });
@@ -189,12 +189,11 @@ export async function setPassword(
       .where(eq(users.username, trimmed))
       .get();
 
-    if (!user) {
-      return { success: false, error: "User not found" };
-    }
-
-    if (user.passwordHash !== null) {
-      return { success: false, error: "Password already set" };
+    // Unified error for "user does not exist" and "user has a password already"
+    // to prevent enumeration of takeoverable accounts. This action is also
+    // slated for removal in the C3 tokenized-reset refactor.
+    if (!user || user.passwordHash !== null) {
+      return { success: false, error: "Unable to set password" };
     }
 
     const hash = await hashPassword(password);
