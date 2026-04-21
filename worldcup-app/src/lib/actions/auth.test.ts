@@ -21,11 +21,13 @@ vi.mock("@/lib/session", () => {
     return !!admin && !!name && name.toLowerCase() === admin;
   };
   const requireUser = vi.fn();
+  const getSessionUser = vi.fn();
   return {
     getSession,
+    getSessionUser,
     isAdminUsername,
     requireUser,
-    __sessionMocks: { save, destroy, sessionState, requireUser },
+    __sessionMocks: { save, destroy, sessionState, requireUser, getSessionUser },
   };
 });
 
@@ -74,9 +76,10 @@ vi.mock("@/lib/password", () => ({
   MIN_PASSWORD_LENGTH: 10,
 }));
 
-import { registerUser, loginUser, logoutUser } from "@/lib/actions/auth";
+import { registerUser, loginUser, logoutUser, changePassword } from "@/lib/actions/auth";
 import { verifyPassword } from "@/lib/password";
 import { __resetRateLimitForTests } from "@/lib/rate-limit";
+import { getSessionUser } from "@/lib/session";
 
 type MockFn = ReturnType<typeof vi.fn>;
 
@@ -299,5 +302,113 @@ describe("auth rate limiting", () => {
     const blocked = await loginUser("victim", "wrong");
     expect(blocked.success).toBe(false);
     if (!blocked.success) expect(blocked.error).toMatch(/too many/i);
+  });
+});
+
+describe("changePassword", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    __resetRateLimitForTests();
+    const s = await getSessionMocks();
+    delete s.sessionState.userId;
+    delete s.sessionState.username;
+    (verifyPassword as MockFn).mockResolvedValue(true);
+  });
+
+  it("rejects when user is not signed in", async () => {
+    (getSessionUser as MockFn).mockResolvedValueOnce(null);
+    const r = await changePassword({
+      currentPassword: "old-passwd-1",
+      newPassword: "NewPass-1234",
+    });
+    expect(r).toEqual({ success: false, error: "Not signed in" });
+  });
+
+  it("rejects when current password is wrong", async () => {
+    (getSessionUser as MockFn).mockResolvedValueOnce({
+      id: 1, username: "u", passwordHash: "s:h", sessionVersion: 1,
+    });
+    (verifyPassword as MockFn).mockResolvedValueOnce(false);
+    const r = await changePassword({
+      currentPassword: "wrong-pass1",
+      newPassword: "NewPass-1234",
+    });
+    expect(r).toEqual({ success: false, error: "Current password is incorrect" });
+  });
+
+  it("rejects when new password is weak", async () => {
+    (getSessionUser as MockFn).mockResolvedValueOnce({
+      id: 1, username: "u", passwordHash: "s:h", sessionVersion: 1,
+    });
+    const r = await changePassword({
+      currentPassword: "old-passwd-1",
+      newPassword: "short",
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/at least 10/);
+  });
+
+  it("rejects when new password equals current", async () => {
+    (getSessionUser as MockFn).mockResolvedValueOnce({
+      id: 1, username: "u", passwordHash: "s:h", sessionVersion: 1,
+    });
+    const r = await changePassword({
+      currentPassword: "SamePass-12",
+      newPassword: "SamePass-12",
+    });
+    expect(r).toEqual({
+      success: false,
+      error: "New password must be different",
+    });
+  });
+
+  it("updates password, bumps sessionVersion, preserves current session", async () => {
+    (getSessionUser as MockFn).mockResolvedValueOnce({
+      id: 42, username: "alice", passwordHash: "s:h", sessionVersion: 3,
+    });
+    const { mockSet } = await getDbMocks();
+
+    const r = await changePassword({
+      currentPassword: "old-passwd-1",
+      newPassword: "NewPass-1234",
+    });
+
+    expect(r).toEqual({ success: true, data: null });
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passwordHash: "salt:hash",
+        sessionVersion: 4,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      })
+    );
+
+    const s = await getSessionMocks();
+    expect(s.save).toHaveBeenCalled();
+    expect(s.sessionState.userId).toBe(42);
+    expect(s.sessionState.username).toBe("alice");
+  });
+
+  it("rate-limits per user after 5 attempts", async () => {
+    for (let i = 0; i < 5; i++) {
+      (getSessionUser as MockFn).mockResolvedValueOnce({
+        id: 99, username: "z", passwordHash: "s:h", sessionVersion: 1,
+      });
+      (verifyPassword as MockFn).mockResolvedValueOnce(false);
+      await changePassword({
+        currentPassword: "wrong-pass1",
+        newPassword: "NewPass-1234",
+      });
+    }
+
+    (getSessionUser as MockFn).mockResolvedValueOnce({
+      id: 99, username: "z", passwordHash: "s:h", sessionVersion: 1,
+    });
+    const r = await changePassword({
+      currentPassword: "wrong-pass1",
+      newPassword: "NewPass-1234",
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/too many/i);
   });
 });

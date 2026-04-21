@@ -5,7 +5,7 @@ import { users, tournamentConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import { hashPassword, verifyPassword, validatePasswordStrength } from "@/lib/password";
-import { getSession, isAdminUsername } from "@/lib/session";
+import { getSession, getSessionUser, isAdminUsername } from "@/lib/session";
 import { checkRateLimit, getClientIp, AUTH_LIMITS } from "@/lib/rate-limit";
 
 const MAX_USERNAME_LENGTH = 30;
@@ -173,6 +173,78 @@ export async function loginUser(
     };
   } catch (error) {
     console.error("loginUser failed:", error);
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
+  }
+}
+
+export async function changePassword(data: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<ActionResult<null>> {
+  const user = await getSessionUser();
+  if (!user) {
+    return { success: false, error: "Not signed in" };
+  }
+
+  // H3: rate-limit by user ID. The attacker is plausibly the session holder
+  // themselves (stolen device, coerced signin), so per-user is the right key.
+  const rl = checkRateLimit(
+    `change-password:user:${user.id}`,
+    AUTH_LIMITS.changePasswordPerUser
+  );
+  if (!rl.allowed) {
+    return { success: false, error: rateLimitMessage(rl.retryAfterMs) };
+  }
+
+  if (!user.passwordHash) {
+    return { success: false, error: "Account has no password set" };
+  }
+
+  const valid = await verifyPassword(data.currentPassword, user.passwordHash);
+  if (!valid) {
+    return { success: false, error: "Current password is incorrect" };
+  }
+
+  const strength = validatePasswordStrength(data.newPassword);
+  if (!strength.valid) {
+    return { success: false, error: strength.reason ?? "Password is too weak" };
+  }
+
+  if (data.currentPassword === data.newPassword) {
+    return { success: false, error: "New password must be different" };
+  }
+
+  try {
+    const hash = await hashPassword(data.newPassword);
+
+    // Bump session_version to invalidate sessions on other devices. The
+    // current session will be re-saved below with the new version so it
+    // stays valid.
+    await db
+      .update(users)
+      .set({
+        passwordHash: hash,
+        passwordChangedAt: new Date().toISOString(),
+        sessionVersion: user.sessionVersion + 1,
+        // Any outstanding reset token should be invalidated on a direct
+        // password change too.
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      })
+      .where(eq(users.id, user.id));
+
+    // Re-save the session so this browser stays signed in.
+    const session = await getSession();
+    session.userId = user.id;
+    session.username = user.username;
+    await session.save();
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("changePassword failed:", error);
     return {
       success: false,
       error: "Something went wrong. Please try again.",
