@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { matches, tournamentConfig, results, groups, groupTeams, groupPicks, picks, users, thirdPlaceAdvancers } from "@/db/schema";
 import { eq, and, asc, inArray } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
 import type { ActionResult } from "@/lib/actions/types";
 import type { TournamentConfig, Result } from "@/types";
 import { ROUND_NAMES, MATCHES_PER_ROUND } from "@/lib/bracket-utils";
@@ -519,9 +520,26 @@ export async function toggleGroupStageLock(
   return { success: true, data: { groupStageLocked: locked } };
 }
 
-export async function adminResetPassword(
+// Token lifetime for admin-initiated password resets. Kept short to limit
+// the window if the out-of-band channel (text, email) is compromised later.
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Generate a one-time reset token for a user. Admin-only.
+ *
+ * Returns the plaintext token to the caller ONCE — only the SHA-256 hash is
+ * persisted, so a DB snapshot does not leak live tokens. The admin is
+ * expected to share the resulting `/forgot-password/<token>` URL with the
+ * user out-of-band (text message, etc).
+ *
+ * Replaces the previous adminResetPassword which wiped passwordHash to null
+ * and relied on the next login to re-set a password — that was C3 in the
+ * audit, because any attacker who guessed the username could then claim the
+ * account.
+ */
+export async function adminGenerateResetToken(
   userId: number
-): Promise<ActionResult<null>> {
+): Promise<ActionResult<{ token: string; expiresAt: string }>> {
   if (!(await verifyAdmin())) {
     return { success: false, error: "Unauthorized" };
   }
@@ -529,13 +547,22 @@ export async function adminResetPassword(
   const user = await db.select().from(users).where(eq(users.id, userId)).get();
   if (!user) return { success: false, error: "User not found" };
 
+  // 32 bytes → 43 chars of base64url. URL-safe + unguessable.
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = createHash("sha256").update(token, "utf8").digest("hex");
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
+
   await db
     .update(users)
-    .set({ passwordHash: null })
+    .set({
+      resetTokenHash: tokenHash,
+      resetTokenExpiresAt: expiresAt,
+    })
     .where(eq(users.id, userId));
 
+  // TODO(audit): log admin_reset_token_generated action
   revalidatePath("/admin");
-  return { success: true, data: null };
+  return { success: true, data: { token, expiresAt } };
 }
 
 export async function setActualTopScorer(

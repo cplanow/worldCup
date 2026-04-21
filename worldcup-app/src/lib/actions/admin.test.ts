@@ -84,15 +84,39 @@ vi.mock("@/db/schema", () => ({
     winner: "winner",
     createdAt: "created_at",
   },
+  users: {
+    id: "id",
+    username: "username",
+    passwordHash: "password_hash",
+    sessionVersion: "session_version",
+    resetTokenHash: "reset_token_hash",
+    resetTokenExpiresAt: "reset_token_expires_at",
+  },
+  groups: { id: "id", name: "name" },
+  groupTeams: { id: "id", groupId: "group_id" },
+  picks: { id: "id", userId: "user_id", matchId: "match_id" },
+  thirdPlaceAdvancers: { id: "id", groupId: "group_id" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col, val) => ({ col, val })),
   and: vi.fn((...args: unknown[]) => ({ type: "and", args })),
   asc: vi.fn((col) => ({ type: "asc", col })),
+  inArray: vi.fn((col, vals) => ({ type: "inArray", col, vals })),
 }));
 
-import { setupMatchup, getMatches, deleteMatchup, getTournamentConfig, toggleLock, checkBracketLock, initializeBracketStructure, enterResult, correctResult } from "./admin";
+import {
+  setupMatchup,
+  getMatches,
+  deleteMatchup,
+  getTournamentConfig,
+  toggleLock,
+  checkBracketLock,
+  initializeBracketStructure,
+  enterResult,
+  correctResult,
+  adminGenerateResetToken,
+} from "./admin";
 import { getSessionUser } from "@/lib/session";
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -603,5 +627,69 @@ describe("enterResult", () => {
     await enterResult({ matchId: 1, winner: "Brazil" });
     // Position 1 (odd) → teamA slot of next match
     expect(mockSet).toHaveBeenCalledWith({ teamA: "Brazil" });
+  });
+});
+
+describe("adminGenerateResetToken", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin users", async () => {
+    mockNonAdmin();
+    const result = await adminGenerateResetToken(1);
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("returns error when user does not exist", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined);
+    const result = await adminGenerateResetToken(999);
+    expect(result).toEqual({ success: false, error: "User not found" });
+  });
+
+  it("generates a token, hashes it, and stores hash + expiry", async () => {
+    mockAdmin();
+    const { mockGet, mockSet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 7, username: "bob" });
+
+    const result = await adminGenerateResetToken(7);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // base64url of 32 bytes → 43 chars (no padding)
+      expect(result.data.token.length).toBeGreaterThanOrEqual(42);
+      expect(result.data.token).toMatch(/^[A-Za-z0-9_-]+$/);
+
+      const expiresMs = Date.parse(result.data.expiresAt);
+      const nowMs = Date.now();
+      expect(expiresMs - nowMs).toBeGreaterThan(59 * 60 * 1000); // ~1 hour
+      expect(expiresMs - nowMs).toBeLessThan(61 * 60 * 1000);
+    }
+
+    // Set was called with a 64-char hex sha256 hash — never the plaintext.
+    const args = mockSet.mock.calls[0]?.[0] as {
+      resetTokenHash?: string;
+      resetTokenExpiresAt?: string;
+    };
+    expect(args?.resetTokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(args?.resetTokenExpiresAt).toMatch(/^\d{4}-/);
+    // Plaintext token should NOT appear in the update payload.
+    if (result.success) {
+      expect(args?.resetTokenHash).not.toBe(result.data.token);
+    }
+  });
+
+  it("generates a fresh token every call", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce({ id: 7, username: "bob" });
+    const a = await adminGenerateResetToken(7);
+    mockGet.mockResolvedValueOnce({ id: 7, username: "bob" });
+    const b = await adminGenerateResetToken(7);
+    if (a.success && b.success) {
+      expect(a.data.token).not.toBe(b.data.token);
+    }
   });
 });

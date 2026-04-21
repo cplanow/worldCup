@@ -4,11 +4,19 @@ import { db } from "@/db";
 import { users, tournamentConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
-import { hashPassword, verifyPassword } from "@/lib/password";
-import { getSession, isAdminUsername } from "@/lib/session";
+import { hashPassword, verifyPassword, validatePasswordStrength } from "@/lib/password";
+import { getSession, getSessionUser, isAdminUsername } from "@/lib/session";
+import { checkRateLimit, getClientIp, AUTH_LIMITS } from "@/lib/rate-limit";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 const MAX_USERNAME_LENGTH = 30;
-const MIN_PASSWORD_LENGTH = 10;
+
+function rateLimitMessage(retryAfterMs: number): string {
+  const seconds = Math.ceil(retryAfterMs / 1000);
+  if (seconds < 60) return `Too many attempts. Try again in ${seconds}s.`;
+  const minutes = Math.ceil(seconds / 60);
+  return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}
 
 async function createSession(userId: number, username: string) {
   const session = await getSession();
@@ -42,11 +50,9 @@ export async function registerUser(
     };
   }
 
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return {
-      success: false,
-      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-    };
+  const strength = validatePasswordStrength(password);
+  if (!strength.valid) {
+    return { success: false, error: strength.reason ?? "Password is too weak" };
   }
 
   // C4 fix: the admin username cannot be claimed via self-registration.
@@ -56,6 +62,13 @@ export async function registerUser(
       success: false,
       error: "That username is reserved. Choose another.",
     };
+  }
+
+  // H3: rate-limit by IP. Defense in depth against automated account creation.
+  const ip = await getClientIp();
+  const rl = checkRateLimit(`register:ip:${ip}`, AUTH_LIMITS.registerPerIp);
+  if (!rl.allowed) {
+    return { success: false, error: rateLimitMessage(rl.retryAfterMs) };
   }
 
   try {
@@ -110,6 +123,22 @@ export async function loginUser(
     return { success: false, error: "Invalid username or password" };
   }
 
+  // H3: rate-limit by IP and by username. Per-IP caps brute force from one
+  // source; per-username caps credential-stuffing distributed across IPs.
+  const ip = await getClientIp();
+  const ipRl = checkRateLimit(`login:ip:${ip}`, AUTH_LIMITS.loginPerIp);
+  if (!ipRl.allowed) {
+    return { success: false, error: rateLimitMessage(ipRl.retryAfterMs) };
+  }
+  const userRl = checkRateLimit(
+    `login:user:${trimmed}`,
+    AUTH_LIMITS.loginPerUsername
+  );
+  if (!userRl.allowed) {
+    // Keep the message generic so we don't leak which usernames exist.
+    return { success: false, error: rateLimitMessage(userRl.retryAfterMs) };
+  }
+
   try {
     const user = await db
       .select()
@@ -145,6 +174,188 @@ export async function loginUser(
     };
   } catch (error) {
     console.error("loginUser failed:", error);
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
+  }
+}
+
+export async function changePassword(data: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<ActionResult<null>> {
+  const user = await getSessionUser();
+  if (!user) {
+    return { success: false, error: "Not signed in" };
+  }
+
+  // H3: rate-limit by user ID. The attacker is plausibly the session holder
+  // themselves (stolen device, coerced signin), so per-user is the right key.
+  const rl = checkRateLimit(
+    `change-password:user:${user.id}`,
+    AUTH_LIMITS.changePasswordPerUser
+  );
+  if (!rl.allowed) {
+    return { success: false, error: rateLimitMessage(rl.retryAfterMs) };
+  }
+
+  if (!user.passwordHash) {
+    return { success: false, error: "Account has no password set" };
+  }
+
+  const valid = await verifyPassword(data.currentPassword, user.passwordHash);
+  if (!valid) {
+    return { success: false, error: "Current password is incorrect" };
+  }
+
+  const strength = validatePasswordStrength(data.newPassword);
+  if (!strength.valid) {
+    return { success: false, error: strength.reason ?? "Password is too weak" };
+  }
+
+  if (data.currentPassword === data.newPassword) {
+    return { success: false, error: "New password must be different" };
+  }
+
+  try {
+    const hash = await hashPassword(data.newPassword);
+
+    // Bump session_version to invalidate sessions on other devices. The
+    // current session will be re-saved below with the new version so it
+    // stays valid.
+    await db
+      .update(users)
+      .set({
+        passwordHash: hash,
+        passwordChangedAt: new Date().toISOString(),
+        sessionVersion: user.sessionVersion + 1,
+        // Any outstanding reset token should be invalidated on a direct
+        // password change too.
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      })
+      .where(eq(users.id, user.id));
+
+    // Re-save the session so this browser stays signed in.
+    const session = await getSession();
+    session.userId = user.id;
+    session.username = user.username;
+    await session.save();
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("changePassword failed:", error);
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
+  }
+}
+
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+function constantTimeEqualHex(a: string, b: string): boolean {
+  // Both inputs are hex strings (sha256 = 64 chars). Reject length mismatches
+  // up front so timingSafeEqual doesn't throw.
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Consume an admin-issued password reset token. No session required — the
+ * token itself is the capability. Validates hash + expiry in constant time,
+ * updates the password, clears the token, bumps session_version, and signs
+ * the user in.
+ */
+export async function consumePasswordResetToken(data: {
+  token: string;
+  newPassword: string;
+}): Promise<ActionResult<AuthResult>> {
+  const { token, newPassword } = data;
+
+  if (!token || typeof token !== "string") {
+    return { success: false, error: "Invalid or expired reset link" };
+  }
+
+  // H3: rate-limit token consumption. Tokens are bearer-like; without a cap
+  // an attacker could grind 43-char base64url space. The space is huge but
+  // DoS via excessive hashing is still a concern.
+  const ip = await getClientIp();
+  const rl = checkRateLimit(
+    `consume-reset:ip:${ip}`,
+    AUTH_LIMITS.consumeResetPerIp
+  );
+  if (!rl.allowed) {
+    return { success: false, error: rateLimitMessage(rl.retryAfterMs) };
+  }
+
+  const strength = validatePasswordStrength(newPassword);
+  if (!strength.valid) {
+    return { success: false, error: strength.reason ?? "Password is too weak" };
+  }
+
+  try {
+    const tokenHash = sha256Hex(token);
+
+    // Find candidate user by exact hash match, then verify expiry + re-check
+    // the hash in constant time (defense against DB driver optimizations
+    // leaking timing info).
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.resetTokenHash, tokenHash))
+      .get();
+
+    if (!user || !user.resetTokenHash || !user.resetTokenExpiresAt) {
+      return { success: false, error: "Invalid or expired reset link" };
+    }
+
+    if (!constantTimeEqualHex(user.resetTokenHash, tokenHash)) {
+      return { success: false, error: "Invalid or expired reset link" };
+    }
+
+    const expiresAt = Date.parse(user.resetTokenExpiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      return { success: false, error: "Invalid or expired reset link" };
+    }
+
+    const hash = await hashPassword(newPassword);
+
+    await db
+      .update(users)
+      .set({
+        passwordHash: hash,
+        passwordChangedAt: new Date().toISOString(),
+        sessionVersion: user.sessionVersion + 1,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      })
+      .where(eq(users.id, user.id));
+
+    const config = await db.select().from(tournamentConfig).get();
+    const isLocked = config?.isLocked ?? false;
+
+    await createSession(user.id, user.username);
+
+    return {
+      success: true,
+      data: {
+        userId: user.id,
+        username: user.username,
+        bracketSubmitted: user.bracketSubmitted,
+        isAdmin: isAdminUsername(user.username),
+        isLocked,
+      },
+    };
+  } catch (error) {
+    console.error("consumePasswordResetToken failed:", error);
     return {
       success: false,
       error: "Something went wrong. Please try again.",

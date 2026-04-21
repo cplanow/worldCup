@@ -10,6 +10,81 @@ const ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const HASH_BITS = 256;
 
+export const MIN_PASSWORD_LENGTH = 10;
+
+// Common-pattern blocklist — kept short and static. This is NOT a full
+// breach-corpus check (that would mean zxcvbn or a download of HIBP); the
+// goal is just to reject the most obvious bad choices. Matched as a
+// case-insensitive substring.
+const PASSWORD_BLOCKLIST = [
+  "password",
+  "passwd",
+  "12345",
+  "qwerty",
+  "letmein",
+  "welcome",
+  "admin",
+  "worldcup",
+  "football",
+  "soccer",
+];
+
+export interface PasswordStrengthResult {
+  valid: boolean;
+  reason?: string;
+}
+
+/**
+ * Validate password strength. Rejects obvious weak patterns without pulling
+ * in a heavyweight library — this is a family pool, not a bank.
+ *
+ * Rules:
+ *  - At least MIN_PASSWORD_LENGTH characters
+ *  - Not all one character class (all lowercase, all uppercase, all digits)
+ *  - Does not contain a common-pattern substring from PASSWORD_BLOCKLIST
+ */
+export function validatePasswordStrength(
+  password: string
+): PasswordStrengthResult {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return {
+      valid: false,
+      reason: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    };
+  }
+
+  if (/^[a-z]+$/.test(password)) {
+    return {
+      valid: false,
+      reason: "Password must include more than just lowercase letters",
+    };
+  }
+  if (/^[A-Z]+$/.test(password)) {
+    return {
+      valid: false,
+      reason: "Password must include more than just uppercase letters",
+    };
+  }
+  if (/^[0-9]+$/.test(password)) {
+    return {
+      valid: false,
+      reason: "Password must include more than just digits",
+    };
+  }
+
+  const lower = password.toLowerCase();
+  for (const term of PASSWORD_BLOCKLIST) {
+    if (lower.includes(term)) {
+      return {
+        valid: false,
+        reason: "Password is too common — pick something less predictable",
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 function toHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
     .map((b) => b.toString(16).padStart(2, "0"))
