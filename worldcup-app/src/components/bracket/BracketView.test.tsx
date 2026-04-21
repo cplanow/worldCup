@@ -11,7 +11,6 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 vi.mock("@/lib/actions/bracket", () => ({
   savePick: vi.fn().mockResolvedValue({ success: true, data: { pickId: 1 } }),
-  deletePicks: vi.fn().mockResolvedValue({ success: true, data: null }),
   submitBracket: vi.fn().mockResolvedValue({ success: true, data: null }),
 }));
 
@@ -53,10 +52,9 @@ vi.mock("@/components/ui/button", () => ({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-import { savePick, deletePicks } from "@/lib/actions/bracket";
+import { savePick } from "@/lib/actions/bracket";
 
 const mockSavePick = vi.mocked(savePick);
-const mockDeletePicks = vi.mocked(deletePicks);
 
 // Minimal 3-match fixture: R32 pos1, R32 pos2, R16 pos1 (placeholder)
 const matches: Match[] = [
@@ -147,35 +145,34 @@ describe("BracketView handleSelect", () => {
     onSelectRef.current = null;
   });
 
-  it("adds a new pick and calls savePick on first tap", () => {
+  it("adds a new pick and calls savePick on first tap", async () => {
     render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
-    act(() => { onSelectRef.current!(1, "Brazil"); });
+    await act(async () => { await onSelectRef.current!(1, "Brazil"); });
 
     expect(screen.getByTestId("pick-count").textContent).toBe("1");
     expect(mockSavePick).toHaveBeenCalledWith({ matchId: 1, selectedTeam: "Brazil" });
-    expect(mockDeletePicks).not.toHaveBeenCalled();
   });
 
-  it("is a no-op when tapping the already-selected team (no server call)", () => {
+  it("is a no-op when tapping the already-selected team (no server call)", async () => {
     render(
       <BracketView matches={matches} picks={[makePick(1, "Brazil")]} isReadOnly={false} />
     );
-    act(() => { onSelectRef.current!(1, "Brazil"); }); // same team — should no-op
+    await act(async () => { await onSelectRef.current!(1, "Brazil"); }); // same team — should no-op
 
     expect(screen.getByTestId("pick-count").textContent).toBe("1"); // count unchanged
     expect(mockSavePick).not.toHaveBeenCalled();
   });
 
-  it("blocks pick on unavailable match and does not call savePick", () => {
+  it("blocks pick on unavailable match and does not call savePick", async () => {
     // R16 match (id:17) has no feeder picks — validatePick returns false
     render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
-    act(() => { onSelectRef.current!(17, "Brazil"); });
+    await act(async () => { await onSelectRef.current!(17, "Brazil"); });
 
     expect(screen.getByTestId("pick-count").textContent).toBe("0");
     expect(mockSavePick).not.toHaveBeenCalled();
   });
 
-  it("clears cascade picks and calls deletePicks when changing a pick", () => {
+  it("optimistically clears cascade picks when changing a pick (server handles the cascade delete)", async () => {
     const initialPicks: BracketPick[] = [
       makePick(1, "Brazil", 10),  // R32 pos1 → Brazil
       makePick(2, "France", 11),  // R32 pos2 → France
@@ -184,29 +181,67 @@ describe("BracketView handleSelect", () => {
     render(
       <BracketView matches={matches} picks={initialPicks} isReadOnly={false} />
     );
-    act(() => { onSelectRef.current!(1, "Germany"); }); // change R32 pos1: Brazil → Germany
+    await act(async () => { await onSelectRef.current!(1, "Germany"); }); // change R32 pos1
 
-    // R16 pick for Brazil cleared: 3 - 1 = 2 picks remain
+    // R16 pick for Brazil cleared optimistically: 3 - 1 = 2 picks remain.
     expect(screen.getByTestId("pick-count").textContent).toBe("2");
+    // Only one server call (M4): the server cascades in the same transaction.
+    expect(mockSavePick).toHaveBeenCalledTimes(1);
     expect(mockSavePick).toHaveBeenCalledWith({ matchId: 1, selectedTeam: "Germany" });
-    expect(mockDeletePicks).toHaveBeenCalledWith({ matchIds: [17] });
   });
 
-  it("does not call deletePicks when changing pick causes no cascade", () => {
-    // Only one R32 pick, no downstream picks
+  it("fires exactly one server call when changing pick causes no cascade", async () => {
     render(
       <BracketView matches={matches} picks={[makePick(1, "Brazil")]} isReadOnly={false} />
     );
-    act(() => { onSelectRef.current!(1, "Germany"); }); // change pick but no R16 pick exists
+    await act(async () => { await onSelectRef.current!(1, "Germany"); });
 
-    expect(mockSavePick).toHaveBeenCalledOnce();
-    expect(mockDeletePicks).not.toHaveBeenCalled();
+    expect(mockSavePick).toHaveBeenCalledTimes(1);
   });
 
-  it("does not call savePick when isReadOnly is true", () => {
+  it("does not call savePick when isReadOnly is true", async () => {
     render(<BracketView matches={matches} picks={[]} isReadOnly={true} />);
-    act(() => { onSelectRef.current!(1, "Brazil"); });
+    await act(async () => { await onSelectRef.current!(1, "Brazil"); });
 
     expect(mockSavePick).not.toHaveBeenCalled();
+  });
+
+  it("rolls back optimistic pick and shows an error banner when savePick fails (M9)", async () => {
+    mockSavePick.mockResolvedValueOnce({ success: false, error: "Bracket already submitted" });
+    render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
+    await act(async () => { await onSelectRef.current!(1, "Brazil"); });
+
+    // Optimistic update rolled back: pick count returns to 0
+    expect(screen.getByTestId("pick-count").textContent).toBe("0");
+    const banner = screen.getByTestId("save-error-banner");
+    expect(banner.textContent).toContain("Bracket already submitted");
+  });
+
+  it("rolls back optimistic cascade clears when savePick fails (M9)", async () => {
+    mockSavePick.mockResolvedValueOnce({ success: false, error: "Brackets are locked" });
+    const initialPicks: BracketPick[] = [
+      makePick(1, "Brazil", 10),
+      makePick(2, "France", 11),
+      makePick(17, "Brazil", 12),
+    ];
+    render(<BracketView matches={matches} picks={initialPicks} isReadOnly={false} />);
+    await act(async () => { await onSelectRef.current!(1, "Germany"); });
+
+    // Before the await resolves, pickCount dropped to 2 (cascade). After
+    // the rejection, we must restore to the original 3.
+    expect(screen.getByTestId("pick-count").textContent).toBe("3");
+    expect(screen.getByTestId("save-error-banner").textContent).toContain("Brackets are locked");
+  });
+
+  it("clears error banner after a subsequent successful save (M9)", async () => {
+    mockSavePick.mockResolvedValueOnce({ success: false, error: "Brackets are locked" });
+    render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
+
+    await act(async () => { await onSelectRef.current!(1, "Brazil"); });
+    expect(screen.queryByTestId("save-error-banner")).not.toBeNull();
+
+    // Next save succeeds (default mock).
+    await act(async () => { await onSelectRef.current!(1, "Brazil"); });
+    expect(screen.queryByTestId("save-error-banner")).toBeNull();
   });
 });
