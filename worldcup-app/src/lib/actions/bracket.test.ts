@@ -120,8 +120,11 @@ describe("savePick", () => {
   });
 
   it("returns error for invalid team in R32 match", async () => {
-    const { mockGet } = await getDbMocks();
+    const { mockGet, mockAll } = await getDbMocks();
     mockGet.mockResolvedValueOnce(mockR32Match);
+    mockAll
+      .mockResolvedValueOnce([]) // userPicks
+      .mockResolvedValueOnce([mockR32Match]); // allMatches
     const result = await savePick({ matchId: 10, selectedTeam: "France" });
     expect(result).toEqual({ success: false, error: "Invalid team selection" });
   });
@@ -137,24 +140,30 @@ describe("savePick", () => {
   });
 
   it("inserts new pick when no existing pick", async () => {
-    const { mockGet, mockReturning } = await getDbMocks();
+    const { mockGet, mockAll, mockReturning } = await getDbMocks();
     mockGet.mockResolvedValueOnce(mockR32Match);
-    mockGet.mockResolvedValueOnce(undefined); // no existing pick
+    mockAll
+      .mockResolvedValueOnce([]) // userPicks: none
+      .mockResolvedValueOnce([mockR32Match]); // allMatches
     mockReturning.mockResolvedValueOnce([{ id: 100 }]);
 
     const result = await savePick({ matchId: 10, selectedTeam: "Brazil" });
     expect(result).toEqual({ success: true, data: { pickId: 100 } });
   });
 
-  it("updates existing pick when pick already exists for this match", async () => {
-    const { mockGet, mockSet } = await getDbMocks();
-    const existingPick = { id: 55, userId: 1, matchId: 10, selectedTeam: "Germany", createdAt: "" };
+  it("updates existing pick when pick already exists for this match (no cascade when team unchanged)", async () => {
+    const { mockGet, mockAll, mockSet, mockBatch } = await getDbMocks();
+    const existingPick = { id: 55, userId: 1, matchId: 10, selectedTeam: "Brazil", createdAt: "" };
     mockGet.mockResolvedValueOnce(mockR32Match);
-    mockGet.mockResolvedValueOnce(existingPick);
+    mockAll
+      .mockResolvedValueOnce([existingPick])
+      .mockResolvedValueOnce([mockR32Match]);
 
+    // Same team as existing → update, no cascade batch
     const result = await savePick({ matchId: 10, selectedTeam: "Brazil" });
     expect(result).toEqual({ success: true, data: { pickId: 55 } });
     expect(mockSet).toHaveBeenCalledWith({ selectedTeam: "Brazil" });
+    expect(mockBatch).not.toHaveBeenCalled();
   });
 
   it("rejects R16 pick when feeder picks have not been made yet (H4)", async () => {
@@ -193,11 +202,56 @@ describe("savePick", () => {
         { id: 102, userId: 1, matchId: 12, selectedTeam: "France", createdAt: "" },
       ])
       .mockResolvedValueOnce(buildMatchesForR2Position1());
-    mockGet.mockResolvedValueOnce(undefined); // no existing pick for R16 match
     mockReturning.mockResolvedValueOnce([{ id: 200 }]);
 
     const result = await savePick({ matchId: 20, selectedTeam: "Brazil" });
     expect(result).toEqual({ success: true, data: { pickId: 200 } });
+  });
+
+  it("cascades downstream picks in a single batch when R32 team changes (M4)", async () => {
+    const { mockGet, mockAll, mockBatch } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockR32Match); // R32 match lookup
+    // Existing picks: Brazil through R32→R16→QF. Switching R32 to Germany
+    // should cascade-clear the R16 and QF picks that still reference Brazil.
+    mockAll
+      .mockResolvedValueOnce([
+        { id: 201, userId: 1, matchId: 10, selectedTeam: "Brazil", createdAt: "" }, // R32 p1
+        { id: 202, userId: 1, matchId: 20, selectedTeam: "Brazil", createdAt: "" }, // R16 p1
+        { id: 203, userId: 1, matchId: 30, selectedTeam: "Brazil", createdAt: "" }, // QF p1
+      ])
+      .mockResolvedValueOnce([
+        { id: 10, teamA: "Brazil", teamB: "Germany", round: 1, position: 1 },
+        { id: 11, teamA: "France", teamB: "Spain", round: 1, position: 2 },
+        { id: 20, teamA: "", teamB: "", round: 2, position: 1 },
+        { id: 30, teamA: "", teamB: "", round: 3, position: 1 },
+      ]);
+    mockBatch.mockResolvedValueOnce([undefined, undefined]);
+
+    const result = await savePick({ matchId: 10, selectedTeam: "Germany" });
+    expect(result).toEqual({ success: true, data: { pickId: 201 } });
+    // Single round-trip: upsert + cascade delete go through db.batch together.
+    expect(mockBatch).toHaveBeenCalledTimes(1);
+    const batchArg = mockBatch.mock.calls[0][0];
+    expect(Array.isArray(batchArg)).toBe(true);
+    expect(batchArg).toHaveLength(2);
+  });
+
+  it("skips cascade batch when same team re-selected (M4)", async () => {
+    const { mockGet, mockAll, mockBatch } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockR32Match);
+    mockAll
+      .mockResolvedValueOnce([
+        { id: 201, userId: 1, matchId: 10, selectedTeam: "Brazil", createdAt: "" },
+        { id: 202, userId: 1, matchId: 20, selectedTeam: "Brazil", createdAt: "" },
+      ])
+      .mockResolvedValueOnce([
+        { id: 10, teamA: "Brazil", teamB: "Germany", round: 1, position: 1 },
+        { id: 20, teamA: "", teamB: "", round: 2, position: 1 },
+      ]);
+
+    const result = await savePick({ matchId: 10, selectedTeam: "Brazil" });
+    expect(result).toEqual({ success: true, data: { pickId: 201 } });
+    expect(mockBatch).not.toHaveBeenCalled();
   });
 });
 

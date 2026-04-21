@@ -6,7 +6,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { checkBracketLock } from "@/lib/actions/admin";
 import { requireUser } from "@/lib/session";
 import type { ActionResult } from "@/lib/actions/types";
-import { getMatchSlot } from "@/lib/bracket-utils";
+import { getCascadingClears, getMatchSlot } from "@/lib/bracket-utils";
 import type { Match, Pick } from "@/types";
 
 export async function savePick(data: {
@@ -35,25 +35,25 @@ export async function savePick(data: {
   const match = await db.select().from(matches).where(eq(matches.id, data.matchId)).get();
   if (!match) return { success: false, error: "Match not found" };
 
+  // Fetch the user's full pick list + all matches once. We need these both
+  // for R2+ slot validation (H4) and for server-side cascade computation
+  // (M4). For R32 picks the matches list is only used by getCascadingClears.
+  const [userPicksRows, allMatchesRows] = await Promise.all([
+    db.select().from(picks).where(eq(picks.userId, user.id)).all(),
+    db.select().from(matches).all(),
+  ]);
+  const userPicks = userPicksRows as Pick[];
+  const allMatches = allMatchesRows as Match[];
+
   if (match.round === 1) {
     if (data.selectedTeam !== match.teamA && data.selectedTeam !== match.teamB) {
       return { success: false, error: "Invalid team selection" };
     }
   } else {
     // Rounds 2-5: candidate teams aren't stored on the match row — they're
-    // derived from the user's earlier picks. Fetch the full pick list and
-    // all matches so we can compute the legal slot.
-    const [userPicks, allMatches] = await Promise.all([
-      db.select().from(picks).where(eq(picks.userId, user.id)).all(),
-      db.select().from(matches).all(),
-    ]);
-
-    const slot = getMatchSlot(
-      match.round,
-      match.position,
-      userPicks as Pick[],
-      allMatches as Match[]
-    );
+    // derived from the user's earlier picks. Reject phantom teams that
+    // couldn't possibly reach this slot given the user's feeder picks.
+    const slot = getMatchSlot(match.round, match.position, userPicks, allMatches);
     if (!slot.teamA || !slot.teamB) {
       return { success: false, error: "Pick is not yet available" };
     }
@@ -62,20 +62,39 @@ export async function savePick(data: {
     }
   }
 
-  const existing = await db
-    .select()
-    .from(picks)
-    .where(and(eq(picks.userId, user.id), eq(picks.matchId, data.matchId)))
-    .get();
+  const existing = userPicks.find((p) => p.matchId === data.matchId) ?? null;
+
+  // M4: if the pick is a change (different team than before), clear the
+  // downstream picks that referenced the dethroned team. Do this server-side
+  // in a single batch so a client that drops the follow-up network call
+  // can't leave us with an R5 pick for a team eliminated in R32.
+  const cascadeIds =
+    existing && existing.selectedTeam !== data.selectedTeam
+      ? getCascadingClears(data.matchId, existing.selectedTeam, userPicks, allMatches)
+      : [];
 
   let pickId: number;
   if (existing) {
-    await db
-      .update(picks)
-      .set({ selectedTeam: data.selectedTeam })
-      .where(eq(picks.id, existing.id));
+    if (cascadeIds.length > 0) {
+      // TODO(audit): log bracket.pick.cascade_clear event (matchIds: cascadeIds)
+      await db.batch([
+        db
+          .update(picks)
+          .set({ selectedTeam: data.selectedTeam })
+          .where(eq(picks.id, existing.id)),
+        db
+          .delete(picks)
+          .where(and(eq(picks.userId, user.id), inArray(picks.matchId, cascadeIds))),
+      ]);
+    } else {
+      await db
+        .update(picks)
+        .set({ selectedTeam: data.selectedTeam })
+        .where(eq(picks.id, existing.id));
+    }
     pickId = existing.id;
   } else {
+    // No prior pick at this match ⇒ nothing downstream to cascade.
     const result = await db
       .insert(picks)
       .values({ userId: user.id, matchId: data.matchId, selectedTeam: data.selectedTeam })
