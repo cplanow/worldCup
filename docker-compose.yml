@@ -27,6 +27,25 @@ services:
     image: worldcup-app:local
     container_name: worldcup-app
     restart: unless-stopped
+    # L5 — container hardening (defense in depth):
+    #   no-new-privileges: setuid binaries inside can't escalate
+    #   cap_drop ALL:      Node 22 doesn't need any Linux capabilities
+    #                       (port 3000 > 1024, runs as unprivileged uid 1001)
+    #   read_only:         root filesystem is read-only; writable paths are
+    #                       explicitly tmpfs-mounted
+    #   tmpfs:             /tmp for general scratch; /app/.next/cache for
+    #                       Next.js runtime fetch-cache writes
+    #   mem_limit / pids_limit: prevent runaway container from taking the host
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    mem_limit: 512m
+    pids_limit: 200
     ports:
       # Reverse proxy (Caddy) lives on citadel (10.0.20.20), a different host
       # from sparta. Cross-host proxying needs LAN reachability, so binding
