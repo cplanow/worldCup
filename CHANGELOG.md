@@ -48,21 +48,71 @@ All notable changes to the worldCup prediction pool are documented here.
 3. `git pull && docker compose up -d --build`.
 4. **Register the admin account immediately** so it isn't claimable.
 
-### Audit findings remaining
-The following audit items are not yet addressed and are candidates for a
-future phase 3: H3 (rate limiting), H4 (server-side pick validation for
-rounds 2-5), H6 (Docker BuildKit secrets for the Turso token), M3
-(session rotation), M4 (server-side cascading bracket clears), M7 (audit
-log table), L1/L5/L7/L8/L9.
+**Phase 3** — remaining high/medium/low findings closed:
 
-### Follow-up work
-- **Password self-service:** the legacy `setPassword` action was removed
-  for security (C3). Users now have no way to change their own password
-  and no forgot-password flow. Add: (1) authenticated password-change
-  form that verifies the current password; (2) admin-initiated tokenized
-  reset emailed/shown-to-admin with a single-use, time-limited token
-  stored as `users.reset_token_hash` + `reset_token_expires_at`. Admin
-  password reset currently requires a direct DB UPDATE.
+### Security (audit remediation, phase 3)
+
+- **H3 rate limiting** (`a46c0c9`) — per-IP and per-username token-bucket
+  rate limits on `registerUser`, `loginUser`, password-change, and
+  reset-token endpoints. In-process state (`src/lib/rate-limit.ts`),
+  acceptable for single-replica sparta deploy.
+- **H4 server-side bracket pick validation for rounds 2-5** (`205033b`)
+  — `savePick` now validates that a round-N+1 pick's team actually
+  advanced from the referenced round-N match, not just trusting the
+  client.
+- **H5 password strength** (`c13553d`) — `validatePasswordStrength` in
+  `src/lib/password.ts`: min 10 chars, short common-pattern blocklist
+  (`password`, `qwerty`, etc.), rejects all-lowercase / all-uppercase /
+  all-digits.
+- **H6 build-time Turso secrets** (`2df8b44`) — all routes forced
+  dynamic; Turso token no longer needed at `next build` time, stays out
+  of build logs / image layers.
+- **M3 session rotation** (`8c32c74`) — `SessionData` carries
+  `sessionVersion`; `users.session_version` bumps on password change and
+  session is re-saved with the new value, invalidating sessions on
+  other devices.
+- **M4 server-side cascading bracket clears** (`7bcad27`, `ffeba3c`) —
+  when a round-N pick changes, downstream round-(N+1..5) picks that
+  referenced the old winner are cleared in a single DB transaction via
+  `clearBracketMatchesIfSafe`. Also reused from `autoSeedR32`.
+- **M7 audit log** (`8c32c74`) — `audit_log` table append-only; wired
+  into result entry/correction, lock toggles, reset-token generation and
+  consumption, password changes. Helper: `src/lib/audit-log.ts`.
+- **M9 surface bracket save errors** (`ba1b9a3`) — UI no longer
+  swallows save failures on bracket mutations; errors shown to user.
+- **L1 username format validation** (`a4afb1e`) — regex
+  `/^[a-z0-9._-]{3,30}$/`, enforced in `registerUser`, silent in
+  `loginUser` (no enumeration).
+- **L7 group name regex** (`4677fe5`) — restricted to `A`-`L`.
+- **L8 orphan match cleanup** (`ffeba3c`) — extracted
+  `clearBracketMatchesIfSafe` helper; bracket reset no longer leaves
+  orphan rows.
+- **L9 SECURITY.md** (`661cd3c`) — vulnerability disclosure policy
+  added at repo root.
+- **Password self-service** (`3067e89`, `799bfad` — task #27):
+  authenticated password change at `/settings/password` via
+  `changePassword` action (verifies current password, validates
+  strength, bumps `session_version`); admin-initiated tokenized reset
+  at `/forgot-password/<token>` consuming an admin-generated 32-byte
+  token (1-hour expiry, SHA-256 hashed and stored on
+  `users.reset_token_hash` / `reset_token_expires_at`). Admin can
+  generate the reset URL from the admin UI and share out-of-band.
+
+### Deployment notes for this release
+
+1. Migration `0007` adds `session_version`, `reset_token_hash`,
+   `reset_token_expires_at` on `users`, plus the `audit_log` table.
+   Apply with `drizzle-kit push` against Turso before rolling the
+   container.
+2. No new env vars required for phase 3 (rate limits and session
+   rotation are self-contained). `SESSION_SECRET` from phase 2 still
+   required.
+3. `git pull && docker compose up -d --build` on sparta.
+
+### Audit findings remaining
+
+- **L5** (container hardening: `no-new-privileges`, read-only root
+  FS). Explicitly deferred.
 
 ## [Unreleased] — 2026-04-20
 

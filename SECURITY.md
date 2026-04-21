@@ -94,9 +94,16 @@ reset-token generation, password change, reset-token consumption.
 
 ## Version History
 
-- 2026-04-21 — security audit phase 3 shipped (rate limiting, audit log,
-  tokenized reset, session rotation, password change, server-side pick
-  validation, bracket cascade transactions)
+- 2026-04-21 — security audit phase 3 shipped: rate limiting
+  (`src/lib/rate-limit.ts`), audit log (`audit_log` table, `src/lib/audit-log.ts`),
+  admin-initiated tokenized reset (1-hour expiry, SHA-256 hashed),
+  session rotation via `session_version`, authenticated password change
+  at `/settings/password`, server-side bracket pick validation for
+  rounds 2-5, cascading bracket clears in a single transaction,
+  username regex, group name regex, orphan match cleanup, password
+  strength policy (min 10, blocklist, class rejection), build-time
+  Turso secrets eliminated. L5 container hardening explicitly
+  deferred.
 - 2026-04-21 — security audit phase 2 shipped (iron-session, IDOR fixes,
   `setPassword` removal)
 - 2026-04-20 — security audit phase 1 shipped (Next.js CVE upgrade, CSP
