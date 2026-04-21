@@ -14,7 +14,29 @@ export const users = sqliteTable("users", {
     .notNull()
     .default(false),
   topScorerPick: text("top_scorer_pick"),
+  // Session rotation (M3): bumping this invalidates all outstanding sessions
+  // for this user. Sessions carry the value-at-issue; mismatch = force logout.
+  sessionVersion: integer("session_version").notNull().default(1),
+  // Tokenized password reset (C3 follow-up). Admin generates a token, stores
+  // the hex SHA-256 hash + expiry; the plaintext token goes to the user once.
+  resetTokenHash: text("reset_token_hash"),
+  resetTokenExpiresAt: text("reset_token_expires_at"),
+  passwordChangedAt: text("password_changed_at"),
 });
+
+// Audit log for admin actions and security-sensitive writes (M7).
+// Append-only; never modified or deleted after insert.
+export const auditLog = sqliteTable("audit_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  actorUserId: integer("actor_user_id").references(() => users.id),
+  actorUsername: text("actor_username"),
+  action: text("action").notNull(),
+  payload: text("payload"),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("idx_audit_log_actor").on(table.actorUserId),
+  index("idx_audit_log_created_at").on(table.createdAt),
+]);
 
 export const tournamentConfig = sqliteTable("tournament_config", {
   id: integer("id").primaryKey({ autoIncrement: true }),
