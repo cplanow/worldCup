@@ -6,9 +6,17 @@ import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { getSession, isAdminUsername } from "@/lib/session";
+import { checkRateLimit, getClientIp, AUTH_LIMITS } from "@/lib/rate-limit";
 
 const MAX_USERNAME_LENGTH = 30;
 const MIN_PASSWORD_LENGTH = 10;
+
+function rateLimitMessage(retryAfterMs: number): string {
+  const seconds = Math.ceil(retryAfterMs / 1000);
+  if (seconds < 60) return `Too many attempts. Try again in ${seconds}s.`;
+  const minutes = Math.ceil(seconds / 60);
+  return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}
 
 async function createSession(userId: number, username: string) {
   const session = await getSession();
@@ -56,6 +64,13 @@ export async function registerUser(
       success: false,
       error: "That username is reserved. Choose another.",
     };
+  }
+
+  // H3: rate-limit by IP. Defense in depth against automated account creation.
+  const ip = await getClientIp();
+  const rl = checkRateLimit(`register:ip:${ip}`, AUTH_LIMITS.registerPerIp);
+  if (!rl.allowed) {
+    return { success: false, error: rateLimitMessage(rl.retryAfterMs) };
   }
 
   try {
@@ -108,6 +123,22 @@ export async function loginUser(
 
   if (!trimmed) {
     return { success: false, error: "Invalid username or password" };
+  }
+
+  // H3: rate-limit by IP and by username. Per-IP caps brute force from one
+  // source; per-username caps credential-stuffing distributed across IPs.
+  const ip = await getClientIp();
+  const ipRl = checkRateLimit(`login:ip:${ip}`, AUTH_LIMITS.loginPerIp);
+  if (!ipRl.allowed) {
+    return { success: false, error: rateLimitMessage(ipRl.retryAfterMs) };
+  }
+  const userRl = checkRateLimit(
+    `login:user:${trimmed}`,
+    AUTH_LIMITS.loginPerUsername
+  );
+  if (!userRl.allowed) {
+    // Keep the message generic so we don't leak which usernames exist.
+    return { success: false, error: rateLimitMessage(userRl.retryAfterMs) };
   }
 
   try {

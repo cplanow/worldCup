@@ -60,6 +60,7 @@ vi.mock("@/lib/password", () => ({
 
 import { registerUser, loginUser, logoutUser } from "@/lib/actions/auth";
 import { verifyPassword } from "@/lib/password";
+import { __resetRateLimitForTests } from "@/lib/rate-limit";
 
 type MockFn = ReturnType<typeof vi.fn>;
 
@@ -88,6 +89,7 @@ describe("registerUser", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     delete process.env.ADMIN_USERNAME;
+    __resetRateLimitForTests();
     const s = await getSessionMocks();
     delete s.sessionState.userId;
     delete s.sessionState.username;
@@ -157,6 +159,7 @@ describe("loginUser", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     delete process.env.ADMIN_USERNAME;
+    __resetRateLimitForTests();
     const s = await getSessionMocks();
     delete s.sessionState.userId;
     delete s.sessionState.username;
@@ -234,5 +237,51 @@ describe("logoutUser", () => {
     const s = await getSessionMocks();
     expect(s.destroy).toHaveBeenCalled();
     expect(s.sessionState.userId).toBeUndefined();
+  });
+});
+
+describe("auth rate limiting", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    __resetRateLimitForTests();
+    delete process.env.ADMIN_USERNAME;
+    const s = await getSessionMocks();
+    delete s.sessionState.userId;
+    delete s.sessionState.username;
+  });
+
+  it("rate-limits registerUser after 5 attempts per IP", async () => {
+    const { mockGet, mockReturning } = await getDbMocks();
+
+    // Let the first 5 succeed. Each consumes a "username taken" path to avoid
+    // persisting any real session state.
+    for (let i = 0; i < 5; i++) {
+      mockGet.mockResolvedValueOnce(undefined);
+      mockReturning.mockResolvedValueOnce([{ id: i, username: `user${i}` }]);
+      mockGet.mockResolvedValueOnce({ isLocked: false });
+      const r = await registerUser(`user${i}`, "password12");
+      expect(r.success).toBe(true);
+    }
+
+    const blocked = await registerUser("user6", "password12");
+    expect(blocked.success).toBe(false);
+    if (!blocked.success) expect(blocked.error).toMatch(/too many/i);
+  });
+
+  it("rate-limits loginUser by username", async () => {
+    const { mockGet } = await getDbMocks();
+    (verifyPassword as MockFn).mockResolvedValue(false);
+
+    for (let i = 0; i < 5; i++) {
+      mockGet.mockResolvedValueOnce({
+        id: 1, username: "victim", passwordHash: "s:h", bracketSubmitted: false,
+      });
+      const r = await loginUser("victim", "wrong");
+      expect(r.success).toBe(false);
+    }
+
+    const blocked = await loginUser("victim", "wrong");
+    expect(blocked.success).toBe(false);
+    if (!blocked.success) expect(blocked.error).toMatch(/too many/i);
   });
 });
