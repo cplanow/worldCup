@@ -8,8 +8,9 @@ import { GroupSetup } from "@/components/admin/GroupSetup";
 import { GroupResultsEntry } from "@/components/admin/GroupResultsEntry";
 import { GroupStageLockToggle } from "@/components/admin/GroupStageLockToggle";
 import { KnockoutSetup } from "@/components/admin/KnockoutSetup";
+import { AdminUserList } from "@/components/admin/AdminUserList";
 import { db } from "@/db";
-import { groups, groupTeams } from "@/db/schema";
+import { groups, groupTeams, users } from "@/db/schema";
 import { asc } from "drizzle-orm";
 import type { Match, Result } from "@/types";
 
@@ -20,14 +21,19 @@ export default async function AdminPage() {
     redirect("/leaderboard");
   }
 
-  const [matchResult, config, resultsResult, allGroups, allGroupTeams, advancersResult] = await Promise.all([
+  const [matchResult, config, resultsResult, allGroups, allGroupTeams, advancersResult, allUsers] = await Promise.all([
     getMatches(),
     getTournamentConfig(),
     getResults(),
     db.select().from(groups).orderBy(asc(groups.name)).all(),
     db.select().from(groupTeams).all(),
     getThirdPlaceAdvancers(),
+    db.select({ id: users.id, username: users.username }).from(users).orderBy(asc(users.username)).all(),
   ]);
+
+  // Base URL for reset links. Configurable so non-prod environments work too.
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://worldcup.chris.planow.com";
 
   const allMatches: Match[] = matchResult.success ? matchResult.data : [];
   const allResults: Result[] = resultsResult.success ? resultsResult.data : [];
@@ -98,6 +104,10 @@ export default async function AdminPage() {
           />
         </div>
       )}
+      <div className="mt-8">
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">User Management</h2>
+        <AdminUserList users={allUsers} baseUrl={baseUrl} />
+      </div>
     </div>
   );
 }

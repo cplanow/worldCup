@@ -7,6 +7,7 @@ import type { ActionResult } from "@/lib/actions/types";
 import { hashPassword, verifyPassword, validatePasswordStrength } from "@/lib/password";
 import { getSession, getSessionUser, isAdminUsername } from "@/lib/session";
 import { checkRateLimit, getClientIp, AUTH_LIMITS } from "@/lib/rate-limit";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 const MAX_USERNAME_LENGTH = 30;
 
@@ -245,6 +246,116 @@ export async function changePassword(data: {
     return { success: true, data: null };
   } catch (error) {
     console.error("changePassword failed:", error);
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
+  }
+}
+
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+function constantTimeEqualHex(a: string, b: string): boolean {
+  // Both inputs are hex strings (sha256 = 64 chars). Reject length mismatches
+  // up front so timingSafeEqual doesn't throw.
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Consume an admin-issued password reset token. No session required — the
+ * token itself is the capability. Validates hash + expiry in constant time,
+ * updates the password, clears the token, bumps session_version, and signs
+ * the user in.
+ */
+export async function consumePasswordResetToken(data: {
+  token: string;
+  newPassword: string;
+}): Promise<ActionResult<AuthResult>> {
+  const { token, newPassword } = data;
+
+  if (!token || typeof token !== "string") {
+    return { success: false, error: "Invalid or expired reset link" };
+  }
+
+  // H3: rate-limit token consumption. Tokens are bearer-like; without a cap
+  // an attacker could grind 43-char base64url space. The space is huge but
+  // DoS via excessive hashing is still a concern.
+  const ip = await getClientIp();
+  const rl = checkRateLimit(
+    `consume-reset:ip:${ip}`,
+    AUTH_LIMITS.consumeResetPerIp
+  );
+  if (!rl.allowed) {
+    return { success: false, error: rateLimitMessage(rl.retryAfterMs) };
+  }
+
+  const strength = validatePasswordStrength(newPassword);
+  if (!strength.valid) {
+    return { success: false, error: strength.reason ?? "Password is too weak" };
+  }
+
+  try {
+    const tokenHash = sha256Hex(token);
+
+    // Find candidate user by exact hash match, then verify expiry + re-check
+    // the hash in constant time (defense against DB driver optimizations
+    // leaking timing info).
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.resetTokenHash, tokenHash))
+      .get();
+
+    if (!user || !user.resetTokenHash || !user.resetTokenExpiresAt) {
+      return { success: false, error: "Invalid or expired reset link" };
+    }
+
+    if (!constantTimeEqualHex(user.resetTokenHash, tokenHash)) {
+      return { success: false, error: "Invalid or expired reset link" };
+    }
+
+    const expiresAt = Date.parse(user.resetTokenExpiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      return { success: false, error: "Invalid or expired reset link" };
+    }
+
+    const hash = await hashPassword(newPassword);
+
+    await db
+      .update(users)
+      .set({
+        passwordHash: hash,
+        passwordChangedAt: new Date().toISOString(),
+        sessionVersion: user.sessionVersion + 1,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      })
+      .where(eq(users.id, user.id));
+
+    const config = await db.select().from(tournamentConfig).get();
+    const isLocked = config?.isLocked ?? false;
+
+    await createSession(user.id, user.username);
+
+    return {
+      success: true,
+      data: {
+        userId: user.id,
+        username: user.username,
+        bracketSubmitted: user.bracketSubmitted,
+        isAdmin: isAdminUsername(user.username),
+        isLocked,
+      },
+    };
+  } catch (error) {
+    console.error("consumePasswordResetToken failed:", error);
     return {
       success: false,
       error: "Something went wrong. Please try again.",

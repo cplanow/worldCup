@@ -56,7 +56,12 @@ vi.mock("@/db", () => {
 });
 
 vi.mock("@/db/schema", () => ({
-  users: { username: "username", id: "id" },
+  users: {
+    username: "username",
+    id: "id",
+    resetTokenHash: "reset_token_hash",
+    resetTokenExpiresAt: "reset_token_expires_at",
+  },
   tournamentConfig: { isLocked: "is_locked" },
 }));
 
@@ -76,10 +81,15 @@ vi.mock("@/lib/password", () => ({
   MIN_PASSWORD_LENGTH: 10,
 }));
 
-import { registerUser, loginUser, logoutUser, changePassword } from "@/lib/actions/auth";
+import { registerUser, loginUser, logoutUser, changePassword, consumePasswordResetToken } from "@/lib/actions/auth";
 import { verifyPassword } from "@/lib/password";
 import { __resetRateLimitForTests } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/session";
+import { createHash } from "node:crypto";
+
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input, "utf8").digest("hex");
+}
 
 type MockFn = ReturnType<typeof vi.fn>;
 
@@ -410,5 +420,98 @@ describe("changePassword", () => {
     });
     expect(r.success).toBe(false);
     if (!r.success) expect(r.error).toMatch(/too many/i);
+  });
+});
+
+describe("consumePasswordResetToken", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    __resetRateLimitForTests();
+    const s = await getSessionMocks();
+    delete s.sessionState.userId;
+    delete s.sessionState.username;
+  });
+
+  it("rejects empty token", async () => {
+    const r = await consumePasswordResetToken({
+      token: "",
+      newPassword: "NewPass-1234",
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/invalid or expired/i);
+  });
+
+  it("rejects weak new password before touching DB", async () => {
+    const r = await consumePasswordResetToken({
+      token: "sometoken",
+      newPassword: "short",
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/at least 10/);
+  });
+
+  it("rejects when no user matches the token hash", async () => {
+    const { mockGet } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(undefined);
+    const r = await consumePasswordResetToken({
+      token: "unknown-token",
+      newPassword: "NewPass-1234",
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/invalid or expired/i);
+  });
+
+  it("rejects when token has expired", async () => {
+    const token = "valid-looking-token";
+    const { mockGet } = await getDbMocks();
+    const pastIso = new Date(Date.now() - 60_000).toISOString();
+    mockGet.mockResolvedValueOnce({
+      id: 1,
+      username: "u",
+      passwordHash: "s:h",
+      sessionVersion: 1,
+      bracketSubmitted: false,
+      resetTokenHash: sha256Hex(token),
+      resetTokenExpiresAt: pastIso,
+    });
+    const r = await consumePasswordResetToken({ token, newPassword: "NewPass-1234" });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/invalid or expired/i);
+  });
+
+  it("updates password, clears token, and signs the user in", async () => {
+    const token = "good-token-abc";
+    const { mockGet, mockSet } = await getDbMocks();
+    const futureIso = new Date(Date.now() + 10 * 60_000).toISOString();
+    mockGet.mockResolvedValueOnce({
+      id: 12,
+      username: "carol",
+      passwordHash: "s:h",
+      sessionVersion: 5,
+      bracketSubmitted: false,
+      resetTokenHash: sha256Hex(token),
+      resetTokenExpiresAt: futureIso,
+    });
+    mockGet.mockResolvedValueOnce({ isLocked: false }); // config query
+
+    const r = await consumePasswordResetToken({ token, newPassword: "NewPass-1234" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.userId).toBe(12);
+      expect(r.data.username).toBe("carol");
+    }
+
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passwordHash: "salt:hash",
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        sessionVersion: 6,
+      })
+    );
+
+    const s = await getSessionMocks();
+    expect(s.save).toHaveBeenCalled();
+    expect(s.sessionState.userId).toBe(12);
   });
 });
