@@ -2,7 +2,7 @@
 
 All notable changes to the worldCup prediction pool are documented here.
 
-## [Unreleased] — 2026-04-21
+## [2026-04-21] — Security Hardening
 
 ### Security (audit remediation)
 
@@ -114,7 +114,7 @@ All notable changes to the worldCup prediction pool are documented here.
 - **L5** (container hardening: `no-new-privileges`, read-only root
   FS). Explicitly deferred.
 
-## [Unreleased] — 2026-04-20
+## [2026-04-20] — Group Stage Expansion + 2026 World Cup Seeding
 
 ### Added
 
