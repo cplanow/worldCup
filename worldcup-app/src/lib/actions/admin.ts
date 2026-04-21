@@ -1,5 +1,17 @@
 "use server";
 
+/**
+ * Admin server actions.
+ *
+ * Invariant for destructive flows (L8):
+ *   Any operation that drops users, picks, or results MUST also consider
+ *   dropping orphan `matches` rows — stale later-round placeholders will
+ *   otherwise surface in the admin UI as phantom data after a wipe.
+ *   Use `clearBracketMatchesIfSafe()` below as the shared cleanup point so
+ *   the guards (bracket lock, no existing results) stay consistent between
+ *   `autoSeedR32` and any future admin wipe action.
+ */
+
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { matches, tournamentConfig, results, groups, groupTeams, groupPicks, picks, users, thirdPlaceAdvancers } from "@/db/schema";
@@ -685,22 +697,74 @@ export async function getThirdPlaceAdvancers(): Promise<ActionResult<number[]>> 
   return { success: true, data: rows.map((r) => r.groupId) };
 }
 
-export async function autoSeedR32(): Promise<ActionResult<{ created: number }>> {
-  if (!(await verifyAdmin())) {
-    return { success: false, error: "Unauthorized" };
-  }
-
+/**
+ * Clear every `matches` row and every `picks` row — but only if the bracket
+ * is unlocked and no results have been entered yet. Returns an
+ * `ActionResult` so callers can short-circuit with the same error messages
+ * the public-facing actions use.
+ *
+ * L8: this is the single source of truth for "safely blow away match state."
+ * `autoSeedR32` reuses it for its pre-seed cleanup (which also nukes orphan
+ * round 2-5 placeholders left behind by earlier seeds) and any future
+ * wipe-users / reset-bracket admin action should reuse it too instead of
+ * writing its own inline DELETE statements.
+ *
+ * Not exported — this is an internal helper. The guards here mirror the
+ * `autoSeedR32` preconditions intentionally so that a direct call from a
+ * future wipe flow picks up the same protections.
+ */
+async function clearBracketMatchesIfSafe(): Promise<ActionResult<{ deleted: number }>> {
   const config = await getTournamentConfig();
   if (config.isLocked) {
-    return { success: false, error: "Cannot auto-seed while bracket is locked" };
+    return { success: false, error: "Cannot clear matches while bracket is locked" };
   }
 
   const existingResults = await db.select().from(results).all();
   if (existingResults.length > 0) {
     return {
       success: false,
-      error: "Cannot auto-seed after match results have been entered",
+      error: "Cannot clear matches after match results have been entered",
     };
+  }
+
+  const allMatches = await db.select().from(matches).all();
+  if (allMatches.length === 0) {
+    return { success: true, data: { deleted: 0 } };
+  }
+
+  // Delete picks first to respect the FK from picks.matchId, then matches.
+  // Drizzle over libSQL doesn't expose an interactive transaction here, so
+  // these run as two sequential statements; worst case on failure between
+  // them is orphaned picks rows (harmless — they reference gone match IDs
+  // and are ignored by scoring).
+  const matchIds = allMatches.map((m) => m.id);
+  await db.delete(picks).where(inArray(picks.matchId, matchIds));
+  await db.delete(matches);
+
+  return { success: true, data: { deleted: allMatches.length } };
+}
+
+export async function autoSeedR32(): Promise<ActionResult<{ created: number }>> {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  // Pre-flight: clear any prior bracket state in a single guarded spot.
+  // This also cleans up orphan round 2-5 placeholders that would otherwise
+  // linger from an earlier seed (L8).
+  const cleared = await clearBracketMatchesIfSafe();
+  if (!cleared.success) {
+    // Preserve the original error phrasing callers expect.
+    if (cleared.error.includes("locked")) {
+      return { success: false, error: "Cannot auto-seed while bracket is locked" };
+    }
+    if (cleared.error.includes("results")) {
+      return {
+        success: false,
+        error: "Cannot auto-seed after match results have been entered",
+      };
+    }
+    return { success: false, error: cleared.error };
   }
 
   const allGroups = await db.select().from(groups).orderBy(asc(groups.name)).all();
@@ -739,33 +803,25 @@ export async function autoSeedR32(): Promise<ActionResult<{ created: number }>> 
     throw err;
   }
 
-  const existingR32 = await db.select().from(matches).where(eq(matches.round, 1)).all();
-  const r32Ids = existingR32.map((m) => m.id);
-  if (r32Ids.length > 0) {
-    await db.delete(picks).where(inArray(picks.matchId, r32Ids));
-    await db.delete(matches).where(inArray(matches.id, r32Ids));
+  // Insert R32 + later-round placeholders in one pass. clearBracketMatchesIfSafe
+  // above removed all existing rows so we always rebuild the full 16 + 15 set.
+  const placeholders: { teamA: string; teamB: string; round: number; position: number }[] = [];
+  for (let round = 2; round <= 5; round++) {
+    const count = MATCHES_PER_ROUND[round];
+    for (let pos = 1; pos <= count; pos++) {
+      placeholders.push({ teamA: "", teamB: "", round, position: pos });
+    }
   }
 
-  await db.insert(matches).values(
-    seeded.map((m) => ({
+  await db.insert(matches).values([
+    ...seeded.map((m) => ({
       teamA: m.teamA,
       teamB: m.teamB,
       round: 1,
       position: m.position,
-    }))
-  );
-
-  const existingLaterRounds = await db.select().from(matches).where(eq(matches.round, 2)).all();
-  if (existingLaterRounds.length === 0) {
-    const placeholders: { teamA: string; teamB: string; round: number; position: number }[] = [];
-    for (let round = 2; round <= 5; round++) {
-      const count = MATCHES_PER_ROUND[round];
-      for (let pos = 1; pos <= count; pos++) {
-        placeholders.push({ teamA: "", teamB: "", round, position: pos });
-      }
-    }
-    await db.insert(matches).values(placeholders);
-  }
+    })),
+    ...placeholders,
+  ]);
 
   revalidatePath("/admin");
   revalidatePath("/bracket");

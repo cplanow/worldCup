@@ -36,6 +36,7 @@ vi.mock("@/db", () => {
     where: mockSelectWhere,
     orderBy: mockSelectOrderBy,
     get: mockGet,
+    all: mockAll,
   }));
 
   return {
@@ -117,6 +118,7 @@ import {
   enterResult,
   correctResult,
   adminGenerateResetToken,
+  autoSeedR32,
 } from "./admin";
 import { getSessionUser } from "@/lib/session";
 
@@ -134,6 +136,16 @@ const getDbMocks = async () => {
     };
   };
   return mod.__mocks;
+};
+
+const getDb = async () => {
+  const mod = (await import("@/db")) as unknown as {
+    db: {
+      delete: MockFn;
+      insert: MockFn;
+    };
+  };
+  return mod.db;
 };
 
 function mockAdmin() {
@@ -673,6 +685,111 @@ describe("setupGroup (L7 name regex)", () => {
     mockReturning.mockResolvedValueOnce([{ id: 1, name }]);
     const r = await setupGroup({ name, teams: validTeams });
     expect(r).toEqual({ success: true, data: { groupId: 1 } });
+  });
+});
+
+describe("autoSeedR32 clearBracketMatchesIfSafe (L8)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_USERNAME;
+  });
+
+  it("rejects non-admin", async () => {
+    mockNonAdmin();
+    const r = await autoSeedR32();
+    expect(r).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("rejects when bracket is locked (via helper guard)", async () => {
+    mockAdmin();
+    const { mockGet } = await getDbMocks();
+    // getTournamentConfig → returns locked config
+    mockGet.mockResolvedValueOnce({ ...mockConfigRow, isLocked: true });
+
+    const r = await autoSeedR32();
+    expect(r).toEqual({
+      success: false,
+      error: "Cannot auto-seed while bracket is locked",
+    });
+  });
+
+  it("rejects when results already exist (via helper guard)", async () => {
+    mockAdmin();
+    const { mockGet, mockAll } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockConfigRow); // unlocked config
+    mockAll.mockResolvedValueOnce([{ id: 1, matchId: 1, winner: "Brazil" }]); // results exist
+
+    const r = await autoSeedR32();
+    expect(r).toEqual({
+      success: false,
+      error: "Cannot auto-seed after match results have been entered",
+    });
+  });
+
+  it("clears ALL matches (not just round 1) and all picks, including orphan later-round rows", async () => {
+    // This is the core L8 behavior: a stale prior seed may have left orphan
+    // round 2-5 placeholders. The helper wipes the whole matches table
+    // unconditionally (within the lock + no-results guards) so nothing stale
+    // survives into the fresh seed.
+    mockAdmin();
+    const { mockGet, mockAll } = await getDbMocks();
+    const db = await getDb();
+
+    mockGet.mockResolvedValueOnce(mockConfigRow); // unlocked config
+    mockAll.mockResolvedValueOnce([]); // no results
+    // Matches table has both R32 AND orphan later-round rows
+    const priorMatches = [
+      { id: 1, round: 1, position: 1 },
+      { id: 17, round: 2, position: 1 }, // orphan
+      { id: 31, round: 5, position: 1 }, // orphan final placeholder
+    ];
+    mockAll.mockResolvedValueOnce(priorMatches);
+    // After clear, autoSeedR32 fetches groups — we short-circuit with 0 groups
+    mockAll.mockResolvedValueOnce([]); // groups query returns empty
+    mockAll.mockResolvedValueOnce([]); // groupTeams
+    mockAll.mockResolvedValueOnce([]); // thirdPlaceAdvancers
+
+    const r = await autoSeedR32();
+
+    // Short-circuit error from the group count check confirms we got past
+    // the cleanup step.
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error).toMatch(/Need all 12 groups/);
+    }
+
+    // Delete was called twice: once for picks, once for the whole matches
+    // table (no .where() on matches → deletes orphan later-round rows too).
+    expect(db.delete).toHaveBeenCalledTimes(2);
+    // One of the calls uses the `matches` schema symbol; one uses `picks`.
+    const deleteArgs = db.delete.mock.calls.map((c: unknown[]) => c[0]);
+    // matches schema mock → { id: "id", teamA: "team_a", ... }
+    // picks schema mock   → { id: "id", userId: "user_id", matchId: "match_id" }
+    const hitPicks = deleteArgs.some(
+      (a) => (a as { userId?: string }).userId === "user_id"
+    );
+    const hitMatches = deleteArgs.some(
+      (a) => (a as { teamA?: string }).teamA === "team_a"
+    );
+    expect(hitPicks).toBe(true);
+    expect(hitMatches).toBe(true);
+  });
+
+  it("skips delete when no prior matches exist", async () => {
+    mockAdmin();
+    const { mockGet, mockAll } = await getDbMocks();
+    const db = await getDb();
+
+    mockGet.mockResolvedValueOnce(mockConfigRow); // unlocked config
+    mockAll.mockResolvedValueOnce([]); // no results
+    mockAll.mockResolvedValueOnce([]); // no existing matches
+    mockAll.mockResolvedValueOnce([]); // groups (trigger the 12-group error)
+    mockAll.mockResolvedValueOnce([]);
+    mockAll.mockResolvedValueOnce([]);
+
+    await autoSeedR32();
+
+    expect(db.delete).not.toHaveBeenCalled();
   });
 });
 
