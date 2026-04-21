@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users, picks, matches, results, tournamentConfig, groupPicks, groupTeams } from "@/db/schema";
 import { asc } from "drizzle-orm";
@@ -7,15 +5,15 @@ import { buildLeaderboardEntries, getPointsPerRound } from "@/lib/scoring-engine
 import { buildCombinedLeaderboard } from "@/lib/group-scoring-engine";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { LockMessage } from "@/components/LockMessage";
+import { requireSessionOrRedirect } from "@/lib/session";
 
 export default async function LeaderboardPage({
   searchParams,
 }: {
   searchParams: Promise<{ locked?: string }>;
 }) {
-  const cookieStore = await cookies();
-  const username = cookieStore.get("username")?.value;
-  if (!username) redirect("/");
+  const sessionUser = await requireSessionOrRedirect();
+  const username = sessionUser.username;
 
   const params = await searchParams;
   const isLocked = params.locked === "1";

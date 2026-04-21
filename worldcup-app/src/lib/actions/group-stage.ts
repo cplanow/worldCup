@@ -6,6 +6,7 @@ import { users, groups, groupTeams, groupPicks, tournamentConfig } from "@/db/sc
 import { eq, and } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import type { GroupPick } from "@/types";
+import { requireUser } from "@/lib/session";
 
 async function isGroupStageLocked(): Promise<boolean> {
   const config = await db.select().from(tournamentConfig).get();
@@ -13,37 +14,39 @@ async function isGroupStageLocked(): Promise<boolean> {
 }
 
 export async function saveGroupPick(data: {
-  userId: number;
   groupId: number;
   firstPlace: string;
   secondPlace: string;
   thirdPlace: string;
   fourthPlace: string;
 }): Promise<ActionResult<{ pickId: number }>> {
-  // 1. Check group stage lock
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { success: false, error: "Unauthenticated" };
+  }
+
   if (await isGroupStageLocked()) {
     return { success: false, error: "Group stage picks are locked" };
   }
 
-  // 2. Validate user exists and not already submitted
-  const user = await db.select().from(users).where(eq(users.id, data.userId)).get();
-  if (!user) return { success: false, error: "User not found" };
   if (user.groupPicksSubmitted) {
     return { success: false, error: "Group picks already submitted" };
   }
 
-  // 3. Validate group exists
   const group = await db.select().from(groups).where(eq(groups.id, data.groupId)).get();
   if (!group) return { success: false, error: "Group not found" };
 
-  // 4. Validate all 4 positions are distinct
   const positions = [data.firstPlace, data.secondPlace, data.thirdPlace, data.fourthPlace];
+  if (positions.some((p) => typeof p !== "string" || p.length === 0 || p.length > 60)) {
+    return { success: false, error: "Invalid team name" };
+  }
   const unique = new Set(positions);
   if (unique.size !== 4) {
     return { success: false, error: "All four positions must be different teams" };
   }
 
-  // 5. Validate all 4 teams belong to the group
   const teamsInGroup = await db
     .select()
     .from(groupTeams)
@@ -57,11 +60,10 @@ export async function saveGroupPick(data: {
     }
   }
 
-  // 6. Upsert into groupPicks
   const existing = await db
     .select()
     .from(groupPicks)
-    .where(and(eq(groupPicks.userId, data.userId), eq(groupPicks.groupId, data.groupId)))
+    .where(and(eq(groupPicks.userId, user.id), eq(groupPicks.groupId, data.groupId)))
     .get();
 
   let pickId: number;
@@ -80,7 +82,7 @@ export async function saveGroupPick(data: {
     const result = await db
       .insert(groupPicks)
       .values({
-        userId: data.userId,
+        userId: user.id,
         groupId: data.groupId,
         firstPlace: data.firstPlace,
         secondPlace: data.secondPlace,
@@ -95,15 +97,19 @@ export async function saveGroupPick(data: {
 }
 
 export async function saveTopScorerPick(data: {
-  userId: number;
   topScorerPick: string;
 }): Promise<ActionResult<null>> {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { success: false, error: "Unauthenticated" };
+  }
+
   if (await isGroupStageLocked()) {
     return { success: false, error: "Group stage picks are locked" };
   }
 
-  const user = await db.select().from(users).where(eq(users.id, data.userId)).get();
-  if (!user) return { success: false, error: "User not found" };
   if (user.groupPicksSubmitted) {
     return { success: false, error: "Group picks already submitted" };
   }
@@ -116,29 +122,31 @@ export async function saveTopScorerPick(data: {
     return { success: false, error: "Top scorer pick must be 100 characters or less" };
   }
 
-  await db.update(users).set({ topScorerPick: trimmed }).where(eq(users.id, data.userId));
+  await db.update(users).set({ topScorerPick: trimmed }).where(eq(users.id, user.id));
 
   return { success: true, data: null };
 }
 
-export async function submitGroupPicks(userId: number): Promise<ActionResult<null>> {
-  // 1. Check group stage lock
+export async function submitGroupPicks(): Promise<ActionResult<null>> {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { success: false, error: "Unauthenticated" };
+  }
+
   if (await isGroupStageLocked()) {
     return { success: false, error: "Group stage picks are locked" };
   }
 
-  // 2. Validate user exists and not already submitted
-  const user = await db.select().from(users).where(eq(users.id, userId)).get();
-  if (!user) return { success: false, error: "User not found" };
   if (user.groupPicksSubmitted) {
     return { success: false, error: "Group picks already submitted" };
   }
 
-  // 3. Count user's group picks - must equal 12 (all groups)
   const userPicks = await db
     .select()
     .from(groupPicks)
-    .where(eq(groupPicks.userId, userId))
+    .where(eq(groupPicks.userId, user.id))
     .all();
 
   if (userPicks.length < 12) {
@@ -148,10 +156,7 @@ export async function submitGroupPicks(userId: number): Promise<ActionResult<nul
     };
   }
 
-  // 4. Each pick must have all 4 positions filled
-  const incomplete = userPicks.find(
-    (p) => !p.thirdPlace || !p.fourthPlace
-  );
+  const incomplete = userPicks.find((p) => !p.thirdPlace || !p.fourthPlace);
   if (incomplete) {
     return {
       success: false,
@@ -159,13 +164,11 @@ export async function submitGroupPicks(userId: number): Promise<ActionResult<nul
     };
   }
 
-  // 5. Golden Boot pick must be set
   if (!user.topScorerPick) {
     return { success: false, error: "Golden Boot pick is required before submitting" };
   }
 
-  // 6. Lock submissions
-  await db.update(users).set({ groupPicksSubmitted: true }).where(eq(users.id, userId));
+  await db.update(users).set({ groupPicksSubmitted: true }).where(eq(users.id, user.id));
 
   revalidatePath("/admin");
   revalidatePath("/leaderboard");
@@ -175,13 +178,18 @@ export async function submitGroupPicks(userId: number): Promise<ActionResult<nul
   return { success: true, data: null };
 }
 
-export async function getGroupPicksForUser(
-  userId: number
-): Promise<ActionResult<GroupPick[]>> {
+export async function getGroupPicksForUser(): Promise<ActionResult<GroupPick[]>> {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { success: false, error: "Unauthenticated" };
+  }
+
   const userPicks = await db
     .select()
     .from(groupPicks)
-    .where(eq(groupPicks.userId, userId))
+    .where(eq(groupPicks.userId, user.id))
     .all();
 
   return { success: true, data: userPicks };

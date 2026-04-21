@@ -14,13 +14,12 @@ interface BracketViewProps {
   matches: Match[];
   picks: Pick[];
   isReadOnly: boolean;
-  userId: number;
   results?: { matchId: number; winner: string }[];
   score?: number;
   maxPossible?: number;
 }
 
-export function BracketView({ matches, picks: initialPicks, isReadOnly, userId, results, score, maxPossible }: BracketViewProps) {
+export function BracketView({ matches, picks: initialPicks, isReadOnly, results, score, maxPossible }: BracketViewProps) {
   const router = useRouter();
   const [localPicks, setLocalPicks] = useState<Pick[]>(initialPicks);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +61,9 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId, 
     setLocalPicks((prev) => {
       const updated = prev.filter((p) => !clearIds.includes(p.matchId));
       const existingIdx = updated.findIndex((p) => p.matchId === matchId);
-      const newPick: Pick = { id: -1, userId, matchId, selectedTeam: team, createdAt: "" };
+      // userId is resolved server-side from the session; placeholder here
+      // is only used while waiting for the server round-trip.
+      const newPick: Pick = { id: -1, userId: 0, matchId, selectedTeam: team, createdAt: "" };
 
       if (existingIdx >= 0) {
         return [...updated.slice(0, existingIdx), newPick, ...updated.slice(existingIdx + 1)];
@@ -71,9 +72,9 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId, 
     });
 
     // Fire-and-forget server saves
-    void savePick({ userId, matchId, selectedTeam: team });
+    void savePick({ matchId, selectedTeam: team });
     if (clearIds.length > 0) {
-      void deletePicks({ userId, matchIds: clearIds });
+      void deletePicks({ matchIds: clearIds });
     }
   }
 
@@ -81,7 +82,7 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, userId, 
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const result = await submitBracket(userId);
+    const result = await submitBracket();
 
     if (result.success) {
       router.push("/leaderboard");

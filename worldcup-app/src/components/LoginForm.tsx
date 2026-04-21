@@ -8,10 +8,9 @@ import { loginUser } from "@/lib/actions/auth";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
-  onNeedsPassword: (username: string) => void;
 }
 
-export function LoginForm({ onSwitchToRegister, onNeedsPassword }: LoginFormProps) {
+export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,10 +27,6 @@ export function LoginForm({ onSwitchToRegister, onNeedsPassword }: LoginFormProp
     const result = await loginUser(username, password);
 
     if (result.success) {
-      if (result.data.needsPassword) {
-        onNeedsPassword(result.data.username);
-        return;
-      }
       const { bracketSubmitted, isLocked } = result.data;
       if (bracketSubmitted) {
         router.push("/leaderboard");

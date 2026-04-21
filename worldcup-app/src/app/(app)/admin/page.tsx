@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getMatches, getTournamentConfig, getResults, getThirdPlaceAdvancers } from "@/lib/actions/admin";
+import { requireSessionOrRedirect, isAdminUsername } from "@/lib/session";
 import { MatchupSetup } from "@/components/admin/MatchupSetup";
 import { BracketLockToggle } from "@/components/admin/BracketLockToggle";
 import { ResultsManager } from "@/components/admin/ResultsManager";
@@ -14,13 +14,9 @@ import { asc } from "drizzle-orm";
 import type { Match, Result } from "@/types";
 
 export default async function AdminPage() {
-  const cookieStore = await cookies();
-  const username = cookieStore.get("username")?.value;
+  const user = await requireSessionOrRedirect();
 
-  if (
-    !username ||
-    username.toLowerCase() !== process.env.ADMIN_USERNAME?.toLowerCase()
-  ) {
+  if (!isAdminUsername(user.username)) {
     redirect("/leaderboard");
   }
 

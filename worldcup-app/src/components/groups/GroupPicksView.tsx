@@ -21,7 +21,6 @@ type GroupPickEntry = {
 };
 
 interface GroupPicksViewProps {
-  userId: number;
   groups: GroupData[];
   existingPicks: GroupPickEntry[];
   initialTopScorer: string | null;
@@ -30,7 +29,6 @@ interface GroupPicksViewProps {
 }
 
 export function GroupPicksView({
-  userId,
   groups,
   existingPicks,
   initialTopScorer,
@@ -62,7 +60,6 @@ export function GroupPicksView({
     fourthPlace: string
   ) {
     const result = await saveGroupPick({
-      userId,
       groupId,
       firstPlace,
       secondPlace,
@@ -84,7 +81,7 @@ export function GroupPicksView({
     if (!trimmed || trimmed === topScorerSaved || disabled) return;
     setSavingScorer(true);
     setError("");
-    const result = await saveTopScorerPick({ userId, topScorerPick: trimmed });
+    const result = await saveTopScorerPick({ topScorerPick: trimmed });
     if (result.success) {
       setTopScorerSaved(trimmed);
     } else {
@@ -97,7 +94,7 @@ export function GroupPicksView({
     if (!allPicked || !hasScorer || disabled) return;
     setSubmitting(true);
     setError("");
-    const result = await submitGroupPicks(userId);
+    const result = await submitGroupPicks();
     if (result.success) {
       router.refresh();
     } else {

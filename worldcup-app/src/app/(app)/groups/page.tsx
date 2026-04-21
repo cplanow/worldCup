@@ -1,17 +1,11 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { users, groups, groupTeams, groupPicks, tournamentConfig } from "@/db/schema";
+import { groups, groupTeams, groupPicks, tournamentConfig } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { GroupPicksView } from "@/components/groups/GroupPicksView";
+import { requireSessionOrRedirect } from "@/lib/session";
 
 export default async function GroupsPage() {
-  const cookieStore = await cookies();
-  const username = cookieStore.get("username")?.value;
-  if (!username) redirect("/");
-
-  const user = await db.select().from(users).where(eq(users.username, username)).get();
-  if (!user) redirect("/");
+  const user = await requireSessionOrRedirect();
 
   const [allGroups, allTeams, userPicks, config] = await Promise.all([
     db.select().from(groups).orderBy(asc(groups.name)).all(),
@@ -41,7 +35,6 @@ export default async function GroupsPage() {
         <p className="text-slate-500">Groups haven&apos;t been set up yet. Check back soon!</p>
       ) : (
         <GroupPicksView
-          userId={user.id}
           groups={groupsWithTeams}
           existingPicks={existingPicks}
           initialTopScorer={user.topScorerPick}

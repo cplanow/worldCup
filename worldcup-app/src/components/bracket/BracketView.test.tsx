@@ -82,24 +82,24 @@ describe("BracketView results mode", () => {
 
   it("uses 'results' mode when isReadOnly=true and results are provided", () => {
     const results = [{ matchId: 1, winner: "Brazil" }];
-    render(<BracketView matches={matches} picks={[]} isReadOnly={true} userId={1} results={results} />);
+    render(<BracketView matches={matches} picks={[]} isReadOnly={true} results={results} />);
     expect(bracketTreeModeRef.current).toBe("results");
   });
 
   it("uses 'readonly' mode when isReadOnly=true but no results provided", () => {
-    render(<BracketView matches={matches} picks={[]} isReadOnly={true} userId={1} />);
+    render(<BracketView matches={matches} picks={[]} isReadOnly={true} />);
     expect(bracketTreeModeRef.current).toBe("readonly");
   });
 
   it("uses 'entry' mode when not read-only", () => {
-    render(<BracketView matches={matches} picks={[]} isReadOnly={false} userId={1} />);
+    render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
     expect(bracketTreeModeRef.current).toBe("entry");
   });
 
   it("shows score summary when results, score, and maxPossible are provided", () => {
     const results = [{ matchId: 1, winner: "Brazil" }];
     render(
-      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+      <BracketView matches={matches} picks={[]} isReadOnly={true}
         results={results} score={5} maxPossible={20} />
     );
     const summary = screen.getByTestId("score-summary-desktop");
@@ -111,7 +111,7 @@ describe("BracketView results mode", () => {
 
   it("does not show score summary when not in results mode", () => {
     render(
-      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+      <BracketView matches={matches} picks={[]} isReadOnly={true}
         score={5} maxPossible={20} />
     );
     expect(screen.queryByText(/Score:/)).toBeNull();
@@ -120,7 +120,7 @@ describe("BracketView results mode", () => {
   it("passes scoreSummary (not ProgressBar) as progressBar prop to RoundView in results mode", () => {
     const results = [{ matchId: 1, winner: "Brazil" }];
     render(
-      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+      <BracketView matches={matches} picks={[]} isReadOnly={true}
         results={results} score={5} maxPossible={20} />
     );
     // RoundView should receive a non-null progressBar (the score summary), not a ProgressBar counter
@@ -132,7 +132,7 @@ describe("BracketView results mode", () => {
   it("score summary uses spec format: Score X pts - Max Y pts", () => {
     const results = [{ matchId: 1, winner: "Brazil" }];
     render(
-      <BracketView matches={matches} picks={[]} isReadOnly={true} userId={1}
+      <BracketView matches={matches} picks={[]} isReadOnly={true}
         results={results} score={7} maxPossible={22} />
     );
     const summary = screen.getByTestId("score-summary-desktop");
@@ -148,17 +148,17 @@ describe("BracketView handleSelect", () => {
   });
 
   it("adds a new pick and calls savePick on first tap", () => {
-    render(<BracketView matches={matches} picks={[]} isReadOnly={false} userId={1} />);
+    render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
     act(() => { onSelectRef.current!(1, "Brazil"); });
 
     expect(screen.getByTestId("pick-count").textContent).toBe("1");
-    expect(mockSavePick).toHaveBeenCalledWith({ userId: 1, matchId: 1, selectedTeam: "Brazil" });
+    expect(mockSavePick).toHaveBeenCalledWith({ matchId: 1, selectedTeam: "Brazil" });
     expect(mockDeletePicks).not.toHaveBeenCalled();
   });
 
   it("is a no-op when tapping the already-selected team (no server call)", () => {
     render(
-      <BracketView matches={matches} picks={[makePick(1, "Brazil")]} isReadOnly={false} userId={1} />
+      <BracketView matches={matches} picks={[makePick(1, "Brazil")]} isReadOnly={false} />
     );
     act(() => { onSelectRef.current!(1, "Brazil"); }); // same team — should no-op
 
@@ -168,7 +168,7 @@ describe("BracketView handleSelect", () => {
 
   it("blocks pick on unavailable match and does not call savePick", () => {
     // R16 match (id:17) has no feeder picks — validatePick returns false
-    render(<BracketView matches={matches} picks={[]} isReadOnly={false} userId={1} />);
+    render(<BracketView matches={matches} picks={[]} isReadOnly={false} />);
     act(() => { onSelectRef.current!(17, "Brazil"); });
 
     expect(screen.getByTestId("pick-count").textContent).toBe("0");
@@ -182,20 +182,20 @@ describe("BracketView handleSelect", () => {
       makePick(17, "Brazil", 12), // R16 pos1 → Brazil (will cascade-clear)
     ];
     render(
-      <BracketView matches={matches} picks={initialPicks} isReadOnly={false} userId={1} />
+      <BracketView matches={matches} picks={initialPicks} isReadOnly={false} />
     );
     act(() => { onSelectRef.current!(1, "Germany"); }); // change R32 pos1: Brazil → Germany
 
     // R16 pick for Brazil cleared: 3 - 1 = 2 picks remain
     expect(screen.getByTestId("pick-count").textContent).toBe("2");
-    expect(mockSavePick).toHaveBeenCalledWith({ userId: 1, matchId: 1, selectedTeam: "Germany" });
-    expect(mockDeletePicks).toHaveBeenCalledWith({ userId: 1, matchIds: [17] });
+    expect(mockSavePick).toHaveBeenCalledWith({ matchId: 1, selectedTeam: "Germany" });
+    expect(mockDeletePicks).toHaveBeenCalledWith({ matchIds: [17] });
   });
 
   it("does not call deletePicks when changing pick causes no cascade", () => {
     // Only one R32 pick, no downstream picks
     render(
-      <BracketView matches={matches} picks={[makePick(1, "Brazil")]} isReadOnly={false} userId={1} />
+      <BracketView matches={matches} picks={[makePick(1, "Brazil")]} isReadOnly={false} />
     );
     act(() => { onSelectRef.current!(1, "Germany"); }); // change pick but no R16 pick exists
 
@@ -204,7 +204,7 @@ describe("BracketView handleSelect", () => {
   });
 
   it("does not call savePick when isReadOnly is true", () => {
-    render(<BracketView matches={matches} picks={[]} isReadOnly={true} userId={1} />);
+    render(<BracketView matches={matches} picks={[]} isReadOnly={true} />);
     act(() => { onSelectRef.current!(1, "Brazil"); });
 
     expect(mockSavePick).not.toHaveBeenCalled();

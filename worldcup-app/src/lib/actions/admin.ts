@@ -1,6 +1,5 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { matches, tournamentConfig, results, groups, groupTeams, groupPicks, picks, users, thirdPlaceAdvancers } from "@/db/schema";
@@ -9,14 +8,11 @@ import type { ActionResult } from "@/lib/actions/types";
 import type { TournamentConfig, Result } from "@/types";
 import { ROUND_NAMES, MATCHES_PER_ROUND } from "@/lib/bracket-utils";
 import { seedR32Matchups, SeedingError, type GroupSeedingInput } from "@/lib/bracket-seeding";
+import { getSessionUser, isAdminUsername } from "@/lib/session";
 
 async function verifyAdmin(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const username = cookieStore.get("username")?.value;
-  return (
-    !!username &&
-    username.toLowerCase() === process.env.ADMIN_USERNAME?.toLowerCase()
-  );
+  const user = await getSessionUser();
+  return !!user && isAdminUsername(user.username);
 }
 
 export async function setupMatchup(data: {

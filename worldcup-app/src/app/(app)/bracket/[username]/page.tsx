@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users, picks, matches, results } from "@/db/schema";
@@ -6,6 +5,7 @@ import { eq, asc } from "drizzle-orm";
 import { BracketView } from "@/components/bracket/BracketView";
 import { getTournamentConfig } from "@/lib/actions/admin";
 import { calculateScore, maxPossiblePoints, getPointsPerRound } from "@/lib/scoring-engine";
+import { requireSessionOrRedirect } from "@/lib/session";
 
 export default async function UserBracketPage({
   params,
@@ -15,12 +15,10 @@ export default async function UserBracketPage({
   const { username } = await params;
   const decodedUsername = decodeURIComponent(username);
 
-  const cookieStore = await cookies();
-  const currentUsername = cookieStore.get("username")?.value;
-  if (!currentUsername) redirect("/");
+  const currentUser = await requireSessionOrRedirect();
 
   // If viewing own bracket, redirect to /bracket
-  if (decodedUsername === currentUsername) {
+  if (decodedUsername === currentUser.username) {
     redirect("/bracket");
   }
 
@@ -77,7 +75,6 @@ export default async function UserBracketPage({
         picks={userPicks}
         results={allResults}
         isReadOnly={true}
-        userId={targetUser.id}
         score={score}
         maxPossible={maxPossible}
       />

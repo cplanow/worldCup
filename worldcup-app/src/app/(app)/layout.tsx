@@ -1,34 +1,14 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { TabNav } from "@/components/navigation/TabNav";
 import { LogoutButton } from "@/components/LogoutButton";
+import { requireSessionOrRedirect, isAdminUsername } from "@/lib/session";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const username = cookieStore.get("username")?.value;
-
-  if (!username) {
-    redirect("/");
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.username, username))
-    .get();
-
-  if (!user) {
-    redirect("/");
-  }
-
-  const isAdmin = username === process.env.ADMIN_USERNAME?.toLowerCase();
+  const user = await requireSessionOrRedirect();
+  const isAdmin = isAdminUsername(user.username);
 
   return (
     <div className="min-h-screen bg-white">

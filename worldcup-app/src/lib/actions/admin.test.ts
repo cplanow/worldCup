@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock next/headers cookies
+// Mock the session helpers — admin.ts now gates on the signed session, not a raw cookie.
+vi.mock("@/lib/session", () => {
+  const getSessionUser = vi.fn();
+  const isAdminUsername = (username: string | undefined | null) => {
+    const admin = process.env.ADMIN_USERNAME?.toLowerCase();
+    return !!admin && !!username && username.toLowerCase() === admin;
+  };
+  return { getSessionUser, isAdminUsername };
+});
+
+// Mock next/headers cookies (still imported by some indirect paths)
 vi.mock("next/headers", () => ({
   cookies: vi.fn().mockResolvedValue({
     get: vi.fn(),
@@ -83,7 +93,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 import { setupMatchup, getMatches, deleteMatchup, getTournamentConfig, toggleLock, checkBracketLock, initializeBracketStructure, enterResult, correctResult } from "./admin";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/session";
 
 type MockFn = ReturnType<typeof vi.fn>;
 
@@ -103,20 +113,17 @@ const getDbMocks = async () => {
 
 function mockAdmin() {
   process.env.ADMIN_USERNAME = "admin";
-  const cookieGet = vi.fn().mockReturnValue({ value: "admin" });
-  (cookies as MockFn).mockResolvedValue({ get: cookieGet });
+  (getSessionUser as MockFn).mockResolvedValue({ id: 1, username: "admin" });
 }
 
 function mockNonAdmin() {
   process.env.ADMIN_USERNAME = "admin";
-  const cookieGet = vi.fn().mockReturnValue({ value: "player1" });
-  (cookies as MockFn).mockResolvedValue({ get: cookieGet });
+  (getSessionUser as MockFn).mockResolvedValue({ id: 2, username: "player1" });
 }
 
 function mockNoCookie() {
   process.env.ADMIN_USERNAME = "admin";
-  const cookieGet = vi.fn().mockReturnValue(undefined);
-  (cookies as MockFn).mockResolvedValue({ get: cookieGet });
+  (getSessionUser as MockFn).mockResolvedValue(null);
 }
 
 describe("setupMatchup", () => {

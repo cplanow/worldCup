@@ -10,10 +10,12 @@
 #
 # .env file (at repo root) must contain:
 #   TURSO_CONNECTION_URL=libsql://<db>.turso.io
-#   TURSO_AUTH_TOKEN=<rotated after Vercel incident 2026-04-20>
+#   TURSO_AUTH_TOKEN=<rotate periodically>
 #   ADMIN_USERNAME=<admin>
+#   SESSION_SECRET=<32+ chars, openssl rand -base64 48>
 #
-# Port mapping: 3002:3000 (3000/3001 already taken by golfModel/draftModel)
+# Port mapping: 127.0.0.1:3002:3000 — loopback only so Caddy is the only
+# path to the container. 3000/3001 taken by golfModel/draftModel.
 
 services:
   worldcup:
@@ -40,6 +42,7 @@ services:
       TURSO_CONNECTION_URL: ${TURSO_CONNECTION_URL}
       TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
+      SESSION_SECRET: ${SESSION_SECRET}
     healthcheck:
       # Force IPv4 — BusyBox wget resolves 'localhost' to ::1 first and Next.js
       # binds to 0.0.0.0 (IPv4) which returns "connection refused" on IPv6.

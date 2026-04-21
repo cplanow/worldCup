@@ -1,30 +1,15 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { AuthContainer } from "@/components/AuthContainer";
+import { getSessionUser } from "@/lib/session";
 
 export default async function Home() {
-  const cookieStore = await cookies();
-  const username = cookieStore.get("username")?.value;
+  const user = await getSessionUser();
 
-  if (username) {
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, username))
-      .get();
-
-    if (user) {
-      if (user.bracketSubmitted) {
-        redirect("/leaderboard");
-      }
-      redirect("/bracket");
+  if (user) {
+    if (user.bracketSubmitted) {
+      redirect("/leaderboard");
     }
-
-    // Stale cookie — user not found in DB; just show login form
-    // (cookie deletion must happen in a Server Action, not a page render)
+    redirect("/bracket");
   }
 
   return (

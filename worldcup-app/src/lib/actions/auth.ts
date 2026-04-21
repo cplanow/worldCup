@@ -1,28 +1,20 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { db } from "@/db";
 import { users, tournamentConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/lib/actions/types";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { getSession, isAdminUsername } from "@/lib/session";
 
 const MAX_USERNAME_LENGTH = 30;
-const MIN_PASSWORD_LENGTH = 4;
+const MIN_PASSWORD_LENGTH = 10;
 
-async function setSessionCookie(username: string) {
-  const cookieStore = await cookies();
-  cookieStore.set("username", username, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-}
-
-function checkIsAdmin(username: string): boolean {
-  const adminUsername = process.env.ADMIN_USERNAME?.toLowerCase();
-  return !!adminUsername && username === adminUsername;
+async function createSession(userId: number, username: string) {
+  const session = await getSession();
+  session.userId = userId;
+  session.username = username;
+  await session.save();
 }
 
 export interface AuthResult {
@@ -31,7 +23,6 @@ export interface AuthResult {
   bracketSubmitted: boolean;
   isAdmin: boolean;
   isLocked: boolean;
-  needsPassword: boolean;
 }
 
 export async function registerUser(
@@ -58,6 +49,15 @@ export async function registerUser(
     };
   }
 
+  // C4 fix: the admin username cannot be claimed via self-registration.
+  // The admin account must be seeded out-of-band.
+  if (isAdminUsername(trimmed)) {
+    return {
+      success: false,
+      error: "That username is reserved. Choose another.",
+    };
+  }
+
   try {
     const existing = await db
       .select()
@@ -79,7 +79,7 @@ export async function registerUser(
     const config = await db.select().from(tournamentConfig).get();
     const isLocked = config?.isLocked ?? false;
 
-    await setSessionCookie(trimmed);
+    await createSession(result[0].id, trimmed);
 
     return {
       success: true,
@@ -87,9 +87,8 @@ export async function registerUser(
         userId: result[0].id,
         username: trimmed,
         bracketSubmitted: false,
-        isAdmin: checkIsAdmin(trimmed),
+        isAdmin: isAdminUsername(trimmed),
         isLocked,
-        needsPassword: false,
       },
     };
   } catch (error) {
@@ -108,7 +107,7 @@ export async function loginUser(
   const trimmed = username.trim().toLowerCase();
 
   if (!trimmed) {
-    return { success: false, error: "Username is required" };
+    return { success: false, error: "Invalid username or password" };
   }
 
   try {
@@ -118,25 +117,10 @@ export async function loginUser(
       .where(eq(users.username, trimmed))
       .get();
 
-    if (!user) {
+    if (!user || user.passwordHash === null) {
+      // Unified error — don't reveal "user exists but has no password"
+      // which would identify takeoverable accounts.
       return { success: false, error: "Invalid username or password" };
-    }
-
-    if (user.passwordHash === null) {
-      const config = await db.select().from(tournamentConfig).get();
-      const isLocked = config?.isLocked ?? false;
-
-      return {
-        success: true,
-        data: {
-          userId: user.id,
-          username: user.username,
-          bracketSubmitted: user.bracketSubmitted,
-          isAdmin: checkIsAdmin(user.username),
-          isLocked,
-          needsPassword: true,
-        },
-      };
     }
 
     const valid = await verifyPassword(password, user.passwordHash);
@@ -147,7 +131,7 @@ export async function loginUser(
     const config = await db.select().from(tournamentConfig).get();
     const isLocked = config?.isLocked ?? false;
 
-    await setSessionCookie(trimmed);
+    await createSession(user.id, user.username);
 
     return {
       success: true,
@@ -155,9 +139,8 @@ export async function loginUser(
         userId: user.id,
         username: user.username,
         bracketSubmitted: user.bracketSubmitted,
-        isAdmin: checkIsAdmin(user.username),
+        isAdmin: isAdminUsername(user.username),
         isLocked,
-        needsPassword: false,
       },
     };
   } catch (error) {
@@ -169,59 +152,10 @@ export async function loginUser(
   }
 }
 
-export async function setPassword(
-  username: string,
-  password: string
-): Promise<ActionResult<{ success: true }>> {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return {
-      success: false,
-      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-    };
-  }
-
-  const trimmed = username.trim().toLowerCase();
-
-  try {
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, trimmed))
-      .get();
-
-    // Unified error for "user does not exist" and "user has a password already"
-    // to prevent enumeration of takeoverable accounts. This action is also
-    // slated for removal in the C3 tokenized-reset refactor.
-    if (!user || user.passwordHash !== null) {
-      return { success: false, error: "Unable to set password" };
-    }
-
-    const hash = await hashPassword(password);
-
-    await db
-      .update(users)
-      .set({ passwordHash: hash })
-      .where(eq(users.id, user.id));
-
-    await setSessionCookie(trimmed);
-
-    return {
-      success: true,
-      data: { success: true },
-    };
-  } catch (error) {
-    console.error("setPassword failed:", error);
-    return {
-      success: false,
-      error: "Something went wrong. Please try again.",
-    };
-  }
-}
-
 export async function logoutUser(): Promise<ActionResult<null>> {
   try {
-    const cookieStore = await cookies();
-    cookieStore.delete("username");
+    const session = await getSession();
+    session.destroy();
     return { success: true, data: null };
   } catch (error) {
     console.error("logoutUser failed:", error);
