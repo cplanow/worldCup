@@ -71,7 +71,14 @@ export function GroupPicksView({
         const filtered = prev.filter((p) => p.groupId !== groupId);
         return [...filtered, { groupId, firstPlace, secondPlace, thirdPlace, fourthPlace }];
       });
+      // M9: clear any previous view-level error on a successful save.
+      setError("");
     } else {
+      // M9: surface the actual server error at the view level in addition
+      // to the per-card generic message. Messages like "Group picks are
+      // locked" or "Group picks already submitted" are actionable and
+      // shouldn't be swallowed.
+      setError(result.error);
       throw new Error(result.error);
     }
   }

@@ -7,7 +7,7 @@ import { RoundView } from "./RoundView";
 import { ProgressBar } from "./ProgressBar";
 import { Button } from "@/components/ui/button";
 import { computeBracketState, getCascadingClears, validatePick, classifyAllPicks, MAX_PICKS } from "@/lib/bracket-utils";
-import { savePick, deletePicks, submitBracket } from "@/lib/actions/bracket";
+import { savePick, submitBracket } from "@/lib/actions/bracket";
 import type { Match, Pick } from "@/types";
 
 interface BracketViewProps {
@@ -24,6 +24,9 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
   const [localPicks, setLocalPicks] = useState<Pick[]>(initialPicks);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // M9: surface server-side savePick failures. Cleared on the next successful
+  // pick so stale errors don't linger after the user recovers.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const bracketState = useMemo(
     () => computeBracketState(matches, localPicks),
@@ -40,7 +43,7 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
     return classifyAllPicks(localPicks, results, matches);
   }, [mode, localPicks, results, matches]);
 
-  function handleSelect(matchId: number, team: string) {
+  async function handleSelect(matchId: number, team: string) {
     if (isReadOnly) return;
 
     const currentPick = localPicks.find((p) => p.matchId === matchId);
@@ -51,11 +54,17 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
     // Guard: pick must be legal (team in match, match available)
     if (!validatePick(matchId, team, matches, localPicks)) return;
 
-    // Compute cascade clears before updating state
+    // Compute cascade clears for the optimistic UI. The server recomputes
+    // the cascade authoritatively, so if the two diverge the server wins and
+    // a refresh will reconcile — but in practice they agree because both
+    // sides run the same pure getCascadingClears.
     let clearIds: number[] = [];
     if (currentPick) {
       clearIds = getCascadingClears(matchId, currentPick.selectedTeam, localPicks, matches);
     }
+
+    // Snapshot the pre-tap state so we can roll back if the server rejects.
+    const previousPicks = localPicks;
 
     // Optimistic state update
     setLocalPicks((prev) => {
@@ -71,10 +80,22 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
       return [...updated, newPick];
     });
 
-    // Fire-and-forget server saves
-    void savePick({ matchId, selectedTeam: team });
-    if (clearIds.length > 0) {
-      void deletePicks({ matchIds: clearIds });
+    // M9: await the server call so we can roll back the optimistic UI if it
+    // rejects (e.g. "Bracket already submitted", "Brackets are locked"). The
+    // server now cascades the clears in the same transaction, so we only
+    // need one round-trip.
+    try {
+      const result = await savePick({ matchId, selectedTeam: team });
+      if (!result.success) {
+        setLocalPicks(previousPicks);
+        setSaveError(result.error);
+        return;
+      }
+      // Clear any previously shown error on successful save.
+      setSaveError(null);
+    } catch {
+      setLocalPicks(previousPicks);
+      setSaveError("Unable to save pick. Check your connection and try again.");
     }
   }
 
@@ -124,6 +145,23 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
 
   return (
     <div>
+      {saveError && (
+        <div
+          data-testid="save-error-banner"
+          className="mx-4 mt-2 mb-4 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          role="alert"
+        >
+          <span>{saveError}</span>
+          <button
+            type="button"
+            onClick={() => setSaveError(null)}
+            className="font-semibold text-red-700 hover:text-red-900"
+            aria-label="Dismiss error"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <BracketTree
         bracketState={bracketState}
         onSelect={handleSelect}

@@ -21,10 +21,12 @@ vi.mock("@/db", () => {
   const mockValues = vi.fn(() => ({ returning: mockReturning }));
   const mockSet = vi.fn(() => ({ where: vi.fn() }));
   const mockDeleteWhere = vi.fn();
+  const mockBatch = vi.fn();
   const mockSelectWhere = vi.fn(() => ({ get: mockGet, all: mockAll }));
   const mockSelectFrom = vi.fn(() => ({
     where: mockSelectWhere,
     get: mockGet,
+    all: mockAll,
   }));
   return {
     db: {
@@ -32,15 +34,16 @@ vi.mock("@/db", () => {
       insert: vi.fn(() => ({ values: mockValues })),
       update: vi.fn(() => ({ set: mockSet })),
       delete: vi.fn(() => ({ where: mockDeleteWhere })),
+      batch: mockBatch,
     },
-    __mocks: { mockGet, mockAll, mockReturning, mockValues, mockSet, mockDeleteWhere },
+    __mocks: { mockGet, mockAll, mockReturning, mockValues, mockSet, mockDeleteWhere, mockBatch },
   };
 });
 
 vi.mock("@/db/schema", () => ({
   picks: { id: "id", userId: "user_id", matchId: "match_id", selectedTeam: "selected_team" },
   users: { id: "id", bracketSubmitted: "bracket_submitted" },
-  matches: { id: "id", teamA: "team_a", teamB: "team_b", round: "round" },
+  matches: { id: "id", teamA: "team_a", teamB: "team_b", round: "round", position: "position" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -60,6 +63,7 @@ const getDbMocks = async () => {
     __mocks: {
       mockGet: MockFn; mockAll: MockFn; mockReturning: MockFn;
       mockValues: MockFn; mockSet: MockFn; mockDeleteWhere: MockFn;
+      mockBatch: MockFn;
     };
   };
   return mod.__mocks;
@@ -69,6 +73,19 @@ const mockUser = { id: 1, username: "chris", bracketSubmitted: false };
 const mockSubmittedUser = { ...mockUser, bracketSubmitted: true };
 const mockR32Match = { id: 10, teamA: "Brazil", teamB: "Germany", round: 1, position: 1 };
 const mockLaterMatch = { id: 20, teamA: "", teamB: "", round: 2, position: 1 };
+
+// Helper: build an "all matches" list for a 32-team bracket that satisfies
+// getMatchSlot's feeder lookups up through round 2 position 1. The returned
+// list includes the two R32 feeders (positions 1 & 2) and the R16 target.
+function buildMatchesForR2Position1(): Array<{
+  id: number; teamA: string; teamB: string; round: number; position: number;
+}> {
+  return [
+    { id: 11, teamA: "Brazil", teamB: "Germany", round: 1, position: 1 },
+    { id: 12, teamA: "France", teamB: "Spain", round: 1, position: 2 },
+    { id: 20, teamA: "", teamB: "", round: 2, position: 1 },
+  ];
+}
 
 describe("savePick", () => {
   beforeEach(() => {
@@ -103,55 +120,138 @@ describe("savePick", () => {
   });
 
   it("returns error for invalid team in R32 match", async () => {
-    const { mockGet } = await getDbMocks();
+    const { mockGet, mockAll } = await getDbMocks();
     mockGet.mockResolvedValueOnce(mockR32Match);
+    mockAll
+      .mockResolvedValueOnce([]) // userPicks
+      .mockResolvedValueOnce([mockR32Match]); // allMatches
     const result = await savePick({ matchId: 10, selectedTeam: "France" });
     expect(result).toEqual({ success: false, error: "Invalid team selection" });
   });
 
   it("rejects empty selectedTeam", async () => {
-    const { mockGet } = await getDbMocks();
-    mockGet.mockResolvedValueOnce(mockLaterMatch);
     const result = await savePick({ matchId: 20, selectedTeam: "" });
     expect(result).toEqual({ success: false, error: "Invalid team selection" });
   });
 
   it("rejects selectedTeam over 60 chars", async () => {
-    const { mockGet } = await getDbMocks();
-    mockGet.mockResolvedValueOnce(mockLaterMatch);
     const result = await savePick({ matchId: 20, selectedTeam: "A".repeat(61) });
     expect(result).toEqual({ success: false, error: "Invalid team selection" });
   });
 
   it("inserts new pick when no existing pick", async () => {
-    const { mockGet, mockReturning } = await getDbMocks();
+    const { mockGet, mockAll, mockReturning } = await getDbMocks();
     mockGet.mockResolvedValueOnce(mockR32Match);
-    mockGet.mockResolvedValueOnce(undefined); // no existing pick
+    mockAll
+      .mockResolvedValueOnce([]) // userPicks: none
+      .mockResolvedValueOnce([mockR32Match]); // allMatches
     mockReturning.mockResolvedValueOnce([{ id: 100 }]);
 
     const result = await savePick({ matchId: 10, selectedTeam: "Brazil" });
     expect(result).toEqual({ success: true, data: { pickId: 100 } });
   });
 
-  it("updates existing pick when pick already exists for this match", async () => {
-    const { mockGet, mockSet } = await getDbMocks();
-    const existingPick = { id: 55, userId: 1, matchId: 10, selectedTeam: "Germany", createdAt: "" };
+  it("updates existing pick when pick already exists for this match (no cascade when team unchanged)", async () => {
+    const { mockGet, mockAll, mockSet, mockBatch } = await getDbMocks();
+    const existingPick = { id: 55, userId: 1, matchId: 10, selectedTeam: "Brazil", createdAt: "" };
     mockGet.mockResolvedValueOnce(mockR32Match);
-    mockGet.mockResolvedValueOnce(existingPick);
+    mockAll
+      .mockResolvedValueOnce([existingPick])
+      .mockResolvedValueOnce([mockR32Match]);
 
+    // Same team as existing → update, no cascade batch
     const result = await savePick({ matchId: 10, selectedTeam: "Brazil" });
     expect(result).toEqual({ success: true, data: { pickId: 55 } });
     expect(mockSet).toHaveBeenCalledWith({ selectedTeam: "Brazil" });
+    expect(mockBatch).not.toHaveBeenCalled();
   });
 
-  it("allows any team for later-round match without R32 teamA/teamB validation", async () => {
-    const { mockGet, mockReturning } = await getDbMocks();
-    mockGet.mockResolvedValueOnce(mockLaterMatch); // round 2
-    mockGet.mockResolvedValueOnce(undefined);       // no existing pick
+  it("rejects R16 pick when feeder picks have not been made yet (H4)", async () => {
+    const { mockGet, mockAll } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockLaterMatch); // round 2 match lookup
+    mockAll
+      .mockResolvedValueOnce([]) // userPicks: no feeder picks
+      .mockResolvedValueOnce(buildMatchesForR2Position1()); // allMatches
+
+    const result = await savePick({ matchId: 20, selectedTeam: "Brazil" });
+    expect(result).toEqual({ success: false, error: "Pick is not yet available" });
+  });
+
+  it("rejects phantom team in R16 pick when candidate slot is known (H4)", async () => {
+    const { mockGet, mockAll } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockLaterMatch); // round 2 match lookup
+    mockAll
+      .mockResolvedValueOnce([
+        // Feeders both picked: Brazil (pos 1) vs France (pos 2)
+        { id: 101, userId: 1, matchId: 11, selectedTeam: "Brazil", createdAt: "" },
+        { id: 102, userId: 1, matchId: 12, selectedTeam: "France", createdAt: "" },
+      ])
+      .mockResolvedValueOnce(buildMatchesForR2Position1());
+
+    // "Argentina" is not one of the two legal candidates (Brazil/France)
+    const result = await savePick({ matchId: 20, selectedTeam: "Argentina" });
+    expect(result).toEqual({ success: false, error: "Invalid team selection" });
+  });
+
+  it("accepts R16 pick when team matches a legal feeder winner (H4)", async () => {
+    const { mockGet, mockAll, mockReturning } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockLaterMatch); // round 2 match lookup
+    mockAll
+      .mockResolvedValueOnce([
+        { id: 101, userId: 1, matchId: 11, selectedTeam: "Brazil", createdAt: "" },
+        { id: 102, userId: 1, matchId: 12, selectedTeam: "France", createdAt: "" },
+      ])
+      .mockResolvedValueOnce(buildMatchesForR2Position1());
     mockReturning.mockResolvedValueOnce([{ id: 200 }]);
 
     const result = await savePick({ matchId: 20, selectedTeam: "Brazil" });
     expect(result).toEqual({ success: true, data: { pickId: 200 } });
+  });
+
+  it("cascades downstream picks in a single batch when R32 team changes (M4)", async () => {
+    const { mockGet, mockAll, mockBatch } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockR32Match); // R32 match lookup
+    // Existing picks: Brazil through R32→R16→QF. Switching R32 to Germany
+    // should cascade-clear the R16 and QF picks that still reference Brazil.
+    mockAll
+      .mockResolvedValueOnce([
+        { id: 201, userId: 1, matchId: 10, selectedTeam: "Brazil", createdAt: "" }, // R32 p1
+        { id: 202, userId: 1, matchId: 20, selectedTeam: "Brazil", createdAt: "" }, // R16 p1
+        { id: 203, userId: 1, matchId: 30, selectedTeam: "Brazil", createdAt: "" }, // QF p1
+      ])
+      .mockResolvedValueOnce([
+        { id: 10, teamA: "Brazil", teamB: "Germany", round: 1, position: 1 },
+        { id: 11, teamA: "France", teamB: "Spain", round: 1, position: 2 },
+        { id: 20, teamA: "", teamB: "", round: 2, position: 1 },
+        { id: 30, teamA: "", teamB: "", round: 3, position: 1 },
+      ]);
+    mockBatch.mockResolvedValueOnce([undefined, undefined]);
+
+    const result = await savePick({ matchId: 10, selectedTeam: "Germany" });
+    expect(result).toEqual({ success: true, data: { pickId: 201 } });
+    // Single round-trip: upsert + cascade delete go through db.batch together.
+    expect(mockBatch).toHaveBeenCalledTimes(1);
+    const batchArg = mockBatch.mock.calls[0][0];
+    expect(Array.isArray(batchArg)).toBe(true);
+    expect(batchArg).toHaveLength(2);
+  });
+
+  it("skips cascade batch when same team re-selected (M4)", async () => {
+    const { mockGet, mockAll, mockBatch } = await getDbMocks();
+    mockGet.mockResolvedValueOnce(mockR32Match);
+    mockAll
+      .mockResolvedValueOnce([
+        { id: 201, userId: 1, matchId: 10, selectedTeam: "Brazil", createdAt: "" },
+        { id: 202, userId: 1, matchId: 20, selectedTeam: "Brazil", createdAt: "" },
+      ])
+      .mockResolvedValueOnce([
+        { id: 10, teamA: "Brazil", teamB: "Germany", round: 1, position: 1 },
+        { id: 20, teamA: "", teamB: "", round: 2, position: 1 },
+      ]);
+
+    const result = await savePick({ matchId: 10, selectedTeam: "Brazil" });
+    expect(result).toEqual({ success: true, data: { pickId: 201 } });
+    expect(mockBatch).not.toHaveBeenCalled();
   });
 });
 
