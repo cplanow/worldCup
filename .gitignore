@@ -1,2 +1,6 @@
 .vercel
 .env*.local
+
+# Security audits — contain exploit details; keep out of public repo.
+SECURITY-AUDIT*.md
+docs/security/
