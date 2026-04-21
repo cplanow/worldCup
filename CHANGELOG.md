@@ -2,6 +2,56 @@
 
 All notable changes to the worldCup prediction pool are documented here.
 
+## [Unreleased] — 2026-04-21
+
+### Security (audit remediation)
+
+**Phase 1** (`2487804`) — quick wins:
+- Upgraded Next.js 16.1.6 → 16.2.4, closing CSRF null-origin bypass
+  (GHSA-mq59-m269-xvcx) and HTTP request smuggling (GHSA-ggv3-7p47-pfv8).
+- Added CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options,
+  Referrer-Policy, Permissions-Policy to every response.
+- Switched `verifyPassword` hash comparison to `crypto.timingSafeEqual`.
+- Forced cookie `secure: true` unconditionally.
+- Unified the `setPassword` "user not found" vs "password already set"
+  errors to prevent enumeration of takeoverable accounts.
+- 60-char cap on admin-entered team names; 100-char cap on top-scorer
+  picks.
+- Bound Docker container port to `127.0.0.1:3002:3000` so Caddy is the
+  only path to the app (no direct plaintext HTTP on the LAN).
+
+**Phase 2** (`310c98d`) — signed-session auth rewrite:
+- Replaced the unsigned `username=<literal>` cookie with an iron-session
+  encrypted + signed session. Cookie values are no longer impersonatable
+  by clients. Requires `SESSION_SECRET` env var (32+ chars).
+- Server actions (`savePick`, `deletePicks`, `submitBracket`,
+  `saveGroupPick`, `saveTopScorerPick`, `submitGroupPicks`,
+  `getGroupPicksForUser`) now derive the user from the session instead
+  of trusting a client-supplied `userId`. Closes IDOR across all
+  pick-related mutations.
+- Removed the unauthenticated `setPassword` action and
+  `SetPasswordForm` component. The legacy migration-bridge takeover
+  primitive is gone; null-password accounts are no longer claimable.
+- `registerUser` rejects the admin username, so the admin account must
+  be seeded out-of-band rather than land-grabbed on a fresh deploy.
+- `MIN_PASSWORD_LENGTH` raised 4 → 10.
+- New helpers in `src/lib/session.ts`:
+  `getSession`, `getSessionUser`, `requireUser`, `requireAdmin`,
+  `requireSessionOrRedirect`, `isAdminUsername`.
+
+### Deployment notes for this release
+1. Generate a session secret: `openssl rand -base64 48`.
+2. Add to sparta's `~/.env`: `SESSION_SECRET="<generated>"`.
+3. `git pull && docker compose up -d --build`.
+4. **Register the admin account immediately** so it isn't claimable.
+
+### Audit findings remaining
+The following audit items are not yet addressed and are candidates for a
+future phase 3: H3 (rate limiting), H4 (server-side pick validation for
+rounds 2-5), H6 (Docker BuildKit secrets for the Turso token), M3
+(session rotation), M4 (server-side cascading bracket clears), M7 (audit
+log table), L1/L5/L7/L8/L9.
+
 ## [Unreleased] — 2026-04-20
 
 ### Added
