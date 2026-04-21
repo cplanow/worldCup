@@ -6,6 +6,8 @@ import { eq, and, inArray } from "drizzle-orm";
 import { checkBracketLock } from "@/lib/actions/admin";
 import { requireUser } from "@/lib/session";
 import type { ActionResult } from "@/lib/actions/types";
+import { getMatchSlot } from "@/lib/bracket-utils";
+import type { Match, Pick } from "@/types";
 
 export async function savePick(data: {
   matchId: number;
@@ -26,17 +28,38 @@ export async function savePick(data: {
     return { success: false, error: "Bracket already submitted" };
   }
 
-  const match = await db.select().from(matches).where(eq(matches.id, data.matchId)).get();
-  if (!match) return { success: false, error: "Match not found" };
-  if (
-    match.round === 1 &&
-    data.selectedTeam !== match.teamA &&
-    data.selectedTeam !== match.teamB
-  ) {
-    return { success: false, error: "Invalid team selection" };
-  }
   if (typeof data.selectedTeam !== "string" || data.selectedTeam.length === 0 || data.selectedTeam.length > 60) {
     return { success: false, error: "Invalid team selection" };
+  }
+
+  const match = await db.select().from(matches).where(eq(matches.id, data.matchId)).get();
+  if (!match) return { success: false, error: "Match not found" };
+
+  if (match.round === 1) {
+    if (data.selectedTeam !== match.teamA && data.selectedTeam !== match.teamB) {
+      return { success: false, error: "Invalid team selection" };
+    }
+  } else {
+    // Rounds 2-5: candidate teams aren't stored on the match row — they're
+    // derived from the user's earlier picks. Fetch the full pick list and
+    // all matches so we can compute the legal slot.
+    const [userPicks, allMatches] = await Promise.all([
+      db.select().from(picks).where(eq(picks.userId, user.id)).all(),
+      db.select().from(matches).all(),
+    ]);
+
+    const slot = getMatchSlot(
+      match.round,
+      match.position,
+      userPicks as Pick[],
+      allMatches as Match[]
+    );
+    if (!slot.teamA || !slot.teamB) {
+      return { success: false, error: "Pick is not yet available" };
+    }
+    if (data.selectedTeam !== slot.teamA && data.selectedTeam !== slot.teamB) {
+      return { success: false, error: "Invalid team selection" };
+    }
   }
 
   const existing = await db
