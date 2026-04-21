@@ -55,6 +55,15 @@ rounds 2-5), H6 (Docker BuildKit secrets for the Turso token), M3
 (session rotation), M4 (server-side cascading bracket clears), M7 (audit
 log table), L1/L5/L7/L8/L9.
 
+### Follow-up work
+- **Password self-service:** the legacy `setPassword` action was removed
+  for security (C3). Users now have no way to change their own password
+  and no forgot-password flow. Add: (1) authenticated password-change
+  form that verifies the current password; (2) admin-initiated tokenized
+  reset emailed/shown-to-admin with a single-use, time-limited token
+  stored as `users.reset_token_hash` + `reset_token_expires_at`. Admin
+  password reset currently requires a direct DB UPDATE.
+
 ## [Unreleased] — 2026-04-20
 
 ### Added
