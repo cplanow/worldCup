@@ -6,6 +6,7 @@ import { BracketTree } from "./BracketTree";
 import { RoundView } from "./RoundView";
 import { ProgressBar } from "./ProgressBar";
 import { Button } from "@/components/ui/button";
+import { RulesPanel } from "@/components/ui/rules-panel";
 import { cn } from "@/lib/utils";
 import {
   computeBracketState,
@@ -198,6 +199,52 @@ export function BracketView({
 
   return (
     <div className="space-y-4 animate-fade-in">
+      {!isReadOnly && (
+        <div className="px-4 md:px-0">
+          <RulesPanel
+            storageKey="rules-panel-bracket"
+            defaultOpenWhenUnsubmitted={true}
+            submitted={isComplete && !!results && results.length > 0}
+            title="How bracket scoring works"
+            collapsedSummary="Escalating rewards: 2 / 4 / 8 / 16 / 32 per round · max 160 pts"
+            rulesAnchor="#bracket"
+          >
+            <p>
+              Pick the winner of every knockout match, R32 through Final.
+              Points <span className="font-semibold">double each round</span>.
+            </p>
+            <div className="mt-3 overflow-hidden rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                  <tr>
+                    <th className="px-3 py-1.5 text-left">Round</th>
+                    <th className="px-3 py-1.5 text-right">Each</th>
+                    <th className="px-3 py-1.5 text-right">Max</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border tabular-nums text-text">
+                  <tr><td className="px-3 py-1.5">R32</td><td className="px-3 py-1.5 text-right">2</td><td className="px-3 py-1.5 text-right font-display font-semibold">32</td></tr>
+                  <tr><td className="px-3 py-1.5">R16</td><td className="px-3 py-1.5 text-right">4</td><td className="px-3 py-1.5 text-right font-display font-semibold">32</td></tr>
+                  <tr><td className="px-3 py-1.5">QF</td><td className="px-3 py-1.5 text-right">8</td><td className="px-3 py-1.5 text-right font-display font-semibold">32</td></tr>
+                  <tr><td className="px-3 py-1.5">SF</td><td className="px-3 py-1.5 text-right">16</td><td className="px-3 py-1.5 text-right font-display font-semibold">32</td></tr>
+                  <tr><td className="px-3 py-1.5">Final</td><td className="px-3 py-1.5 text-right">32</td><td className="px-3 py-1.5 text-right font-display font-semibold">32</td></tr>
+                  <tr className="bg-surface-2 font-semibold">
+                    <td className="px-3 py-1.5">Total</td>
+                    <td className="px-3 py-1.5 text-right text-text-muted">—</td>
+                    <td className="px-3 py-1.5 text-right font-display font-bold text-accent-strong">160</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-text-muted">
+              A correct Final pick is worth{" "}
+              <span className="font-display font-bold tabular-nums">16×</span> a
+              correct R32 pick — nobody is out of it until the last match.
+            </p>
+          </RulesPanel>
+        </div>
+      )}
+
       {saveError && (
         <div
           data-testid="save-error-banner"

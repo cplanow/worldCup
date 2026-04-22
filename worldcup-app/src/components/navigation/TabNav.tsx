@@ -16,6 +16,7 @@ interface Tab {
 }
 
 const tabs: Tab[] = [
+  { label: "Rules", href: "/rules" },
   { label: "Leaderboard", href: "/leaderboard" },
   { label: "Groups", href: "/groups" },
   { label: "My Bracket", href: "/bracket" },

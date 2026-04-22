@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GroupCard } from "./GroupCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RulesPanel } from "@/components/ui/rules-panel";
 import {
   saveGroupPick,
   saveTopScorerPick,
@@ -128,6 +129,51 @@ export function GroupPicksView({
 
   return (
     <div>
+      <RulesPanel
+        storageKey="rules-panel-groups"
+        defaultOpenWhenUnsubmitted={true}
+        submitted={isSubmitted}
+        title="How group scoring works"
+        collapsedSummary="Max 156 pts · 2 per correct position + 5 for a perfect group"
+        rulesAnchor="#group-stage"
+      >
+        <p>
+          Rank all 4 teams in each of the 12 groups, 1st through 4th.
+        </p>
+        <ul className="mt-3 space-y-1.5 text-text">
+          <li className="flex items-baseline gap-2">
+            <span className="inline-block h-1.5 w-1.5 shrink-0 translate-y-1.5 rounded-full bg-accent" />
+            <span>
+              <span className="font-display font-bold tabular-nums">2</span>{" "}
+              points per team in the correct position
+            </span>
+          </li>
+          <li className="flex items-baseline gap-2">
+            <span className="inline-block h-1.5 w-1.5 shrink-0 translate-y-1.5 rounded-full bg-accent" />
+            <span>
+              <span className="font-display font-bold tabular-nums">+5</span>{" "}
+              point bonus for a perfect group (all 4 exactly right)
+            </span>
+          </li>
+          <li className="flex items-baseline gap-2">
+            <span className="inline-block h-1.5 w-1.5 shrink-0 translate-y-1.5 rounded-full bg-accent" />
+            <span>
+              Max per group:{" "}
+              <span className="font-display font-bold tabular-nums">13 pts</span>
+              {" · "}Max total:{" "}
+              <span className="font-display font-bold tabular-nums">
+                156 pts
+              </span>
+            </span>
+          </li>
+        </ul>
+        <p className="mt-3 text-text-muted">
+          <span className="font-semibold text-text">Golden Boot:</span>{" "}
+          predict the tournament&apos;s top scorer — required to submit, breaks
+          ties on the final leaderboard.
+        </p>
+      </RulesPanel>
+
       {/* Status header — progress + submission/lock state */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-text-muted">{progressLabel}</p>
