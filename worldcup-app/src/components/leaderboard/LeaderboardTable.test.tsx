@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { LeaderboardTable } from "./LeaderboardTable";
 import type { LeaderboardEntry } from "@/types";
 
@@ -34,85 +34,111 @@ const ENTRIES: LeaderboardEntry[] = [
   makeEntry(3, "carol", 10, 3, { maxPossible: 15, championPick: null, isEliminated: true }),
 ];
 
+// The component now renders both a desktop <table> and a mobile <ul> list.
+// Tests scope to one surface at a time to keep assertions unambiguous.
+function renderTable(currentUsername: string, entries: LeaderboardEntry[] = ENTRIES) {
+  const result = render(
+    <LeaderboardTable entries={entries} currentUsername={currentUsername} />
+  );
+  const table = result.container.querySelector("table") as HTMLTableElement;
+  const mobileList = result.container.querySelector("ul[role='list']") as HTMLUListElement;
+  return { ...result, table, mobileList };
+}
+
 describe("LeaderboardTable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders a row for every entry", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="carol" />);
-    expect(screen.getByText("alice")).toBeTruthy();
-    expect(screen.getByText("bob")).toBeTruthy();
-    expect(screen.getByText("carol")).toBeTruthy();
+  it("renders a row in the desktop table for every entry", () => {
+    const { table } = renderTable("carol");
+    expect(within(table).getByText("alice")).toBeTruthy();
+    expect(within(table).getByText("bob")).toBeTruthy();
+    expect(within(table).getByText("carol")).toBeTruthy();
   });
 
-  it("displays rank numbers in the rank column", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="carol" />);
-    // rank 2 and 3 are plain numbers
-    expect(screen.getByText("2")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
+  it("renders a stacked mobile card for every entry", () => {
+    const { mobileList } = renderTable("carol");
+    expect(mobileList.querySelectorAll(":scope > li").length).toBe(3);
   });
 
-  it("shows rank 1 with gold badge styling", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="carol" />);
-    const rankOneSpan = screen.getByText("1");
-    expect(rankOneSpan.className).toContain("bg-[#D4AF37]");
-    expect(rankOneSpan.className).toContain("rounded-full");
+  it("displays rank pills for ranks 2 and 3", () => {
+    const { table } = renderTable("carol");
+    const rankTwo = within(table).getByTestId("rank-pill-2");
+    const rankThree = within(table).getByTestId("rank-pill-3");
+    expect(rankTwo.textContent).toBe("2");
+    expect(rankThree.textContent).toBe("3");
   });
 
-  it("highlights the current user row with emerald background", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const aliceCell = screen.getByText("alice").closest("tr");
-    expect(aliceCell?.className).toContain("bg-emerald-50");
+  it("shows rank 1 with the accent gradient pill", () => {
+    const { table } = renderTable("carol");
+    const rankOne = within(table).getByTestId("rank-pill-1");
+    expect(rankOne.className).toContain("bg-accent-gradient");
+    expect(rankOne.className).toContain("rounded-full");
+    expect(rankOne.textContent).toBe("1");
   });
 
-  it("does not highlight other users rows", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const bobCell = screen.getByText("bob").closest("tr");
-    expect(bobCell?.className ?? "").not.toContain("bg-emerald-50");
+  it("renders rank 2 with silver (info) tokens and rank 3 with bronze (warning) tokens", () => {
+    const { table } = renderTable("carol");
+    const rankTwo = within(table).getByTestId("rank-pill-2");
+    const rankThree = within(table).getByTestId("rank-pill-3");
+    expect(rankTwo.className).toContain("bg-info-bg");
+    expect(rankTwo.className).toContain("text-info");
+    expect(rankThree.className).toContain("bg-warning-bg");
+    expect(rankThree.className).toContain("text-warning");
   });
 
-  it("shows eliminated user max points with muted (slate-400) styling", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const carolRow = screen.getByText("carol").closest("tr");
-    // carol is eliminated — find the max-points cell in her row
+  it("highlights the current user row with an accent tint", () => {
+    const { table } = renderTable("alice");
+    const aliceRow = within(table).getByText("alice").closest("tr");
+    expect(aliceRow?.className).toContain("bg-accent/8");
+  });
+
+  it("does not highlight other users' rows", () => {
+    const { table } = renderTable("alice");
+    const bobRow = within(table).getByText("bob").closest("tr");
+    expect(bobRow?.className ?? "").not.toContain("bg-accent/8");
+  });
+
+  it("shows eliminated user's max points with subtle text styling", () => {
+    const { table } = renderTable("alice");
+    const carolRow = within(table).getByText("carol").closest("tr");
     const cells = carolRow?.querySelectorAll("td");
-    const maxCell = cells?.[3]; // 4th cell: Max column
-    expect(maxCell?.className).toContain("text-slate-400");
+    // cells: [rank, name, total/score, max, champion]
+    const maxCell = cells?.[3];
+    expect(maxCell?.className).toContain("text-text-subtle");
   });
 
-  it("shows non-eliminated user max points without muted styling", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const aliceRow = screen.getByText("alice").closest("tr");
+  it("shows non-eliminated user's max points without the subtle modifier", () => {
+    const { table } = renderTable("alice");
+    const aliceRow = within(table).getByText("alice").closest("tr");
     const cells = aliceRow?.querySelectorAll("td");
     const maxCell = cells?.[3];
-    expect(maxCell?.className ?? "").not.toContain("text-slate-400");
+    expect(maxCell?.className).toContain("text-text-muted");
+    expect(maxCell?.className).not.toContain("text-text-subtle");
   });
 
-  it("renders champion pick with strikethrough when champion is eliminated", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const franceSpan = screen.getByText("France");
+  it("renders champion pick with strikethrough + error tokens when eliminated", () => {
+    const { table } = renderTable("alice");
+    const franceSpan = within(table).getByText("France");
     expect(franceSpan.className).toContain("line-through");
-    expect(franceSpan.className).toContain("bg-red-100");
+    expect(franceSpan.className).toContain("bg-error-bg");
   });
 
-  it("renders champion pick with emerald accent when champion is alive", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const brazilSpan = screen.getByText("Brazil");
-    expect(brazilSpan.className).toContain("bg-emerald-100");
+  it("renders champion pick with success tokens when alive", () => {
+    const { table } = renderTable("alice");
+    const brazilSpan = within(table).getByText("Brazil");
+    expect(brazilSpan.className).toContain("bg-success-bg");
     expect(brazilSpan.className).not.toContain("line-through");
   });
 
   it("renders a dash when the user has no champion pick", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    // carol has no champion pick → should render "—"
-    expect(screen.getByText("—")).toBeTruthy();
+    const { table } = renderTable("alice");
+    expect(within(table).getByText("—")).toBeTruthy();
   });
 
   it("uses semantic table elements", () => {
-    const { container } = render(
-      <LeaderboardTable entries={ENTRIES} currentUsername="alice" />
-    );
+    const { container } = renderTable("alice");
     expect(container.querySelector("table")).toBeTruthy();
     expect(container.querySelector("thead")).toBeTruthy();
     expect(container.querySelector("tbody")).toBeTruthy();
@@ -120,9 +146,7 @@ describe("LeaderboardTable", () => {
   });
 
   it("renders column headers with scope=col for accessibility", () => {
-    const { container } = render(
-      <LeaderboardTable entries={ENTRIES} currentUsername="alice" />
-    );
+    const { container } = renderTable("alice");
     const headers = container.querySelectorAll("th");
     headers.forEach((th) => {
       expect(th.getAttribute("scope")).toBe("col");
@@ -137,52 +161,73 @@ describe("LeaderboardTable", () => {
     expect(rows.length).toBe(0);
   });
 
-  it("displays scores for all users", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    expect(screen.getByText("30")).toBeTruthy();
-    expect(screen.getByText("20")).toBeTruthy();
-    expect(screen.getByText("10")).toBeTruthy();
+  it("displays scores for all users in the desktop table", () => {
+    const { table } = renderTable("alice");
+    expect(within(table).getByText("30")).toBeTruthy();
+    expect(within(table).getByText("20")).toBeTruthy();
+    expect(within(table).getByText("10")).toBeTruthy();
   });
 
   it("clicking another user's row navigates to /bracket/[username]", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const bobRow = screen.getByText("bob").closest("tr");
+    const { table } = renderTable("alice");
+    const bobRow = within(table).getByText("bob").closest("tr");
     fireEvent.click(bobRow!);
     expect(mockPush).toHaveBeenCalledWith("/bracket/bob");
   });
 
   it("clicking current user's row navigates to /bracket (own bracket)", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const aliceRow = screen.getByText("alice").closest("tr");
+    const { table } = renderTable("alice");
+    const aliceRow = within(table).getByText("alice").closest("tr");
     fireEvent.click(aliceRow!);
     expect(mockPush).toHaveBeenCalledWith("/bracket");
   });
 
   it("pressing Enter on a row triggers navigation", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const bobRow = screen.getByText("bob").closest("tr");
+    const { table } = renderTable("alice");
+    const bobRow = within(table).getByText("bob").closest("tr");
     fireEvent.keyDown(bobRow!, { key: "Enter" });
     expect(mockPush).toHaveBeenCalledWith("/bracket/bob");
   });
 
   it("pressing Space on a row triggers navigation", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const bobRow = screen.getByText("bob").closest("tr");
+    const { table } = renderTable("alice");
+    const bobRow = within(table).getByText("bob").closest("tr");
     fireEvent.keyDown(bobRow!, { key: " " });
     expect(mockPush).toHaveBeenCalledWith("/bracket/bob");
   });
 
-  it("rows have cursor-pointer class for clickability", () => {
-    render(<LeaderboardTable entries={ENTRIES} currentUsername="alice" />);
-    const bobRow = screen.getByText("bob").closest("tr");
+  it("desktop rows have cursor-pointer class for clickability", () => {
+    const { table } = renderTable("alice");
+    const bobRow = within(table).getByText("bob").closest("tr");
     expect(bobRow?.className).toContain("cursor-pointer");
   });
 
   it("encodes special characters in username for URL", () => {
     const specialEntry = makeEntry(4, "user name", 5, 4);
-    render(<LeaderboardTable entries={[specialEntry]} currentUsername="alice" />);
-    const row = screen.getByText("user name").closest("tr");
+    const { table } = renderTable("alice", [specialEntry]);
+    const row = within(table).getByText("user name").closest("tr");
     fireEvent.click(row!);
     expect(mockPush).toHaveBeenCalledWith("/bracket/user%20name");
+  });
+
+  it("renders a rank delta indicator when previousRank differs from rank", () => {
+    const entry = makeEntry(5, "dave", 12, 2, {});
+    render(
+      <LeaderboardTable
+        entries={[{ ...entry, previousRank: 5 }]}
+        currentUsername="alice"
+      />
+    );
+    // Moved up 3 spots (from 5 to 2)
+    const deltas = screen.getAllByLabelText("up 3");
+    expect(deltas.length).toBeGreaterThan(0);
+  });
+
+  it("does not render a rank delta when previousRank is undefined", () => {
+    const { container } = render(
+      <LeaderboardTable entries={ENTRIES} currentUsername="alice" />
+    );
+    expect(container.querySelector("[aria-label^='up ']")).toBeNull();
+    expect(container.querySelector("[aria-label^='down ']")).toBeNull();
   });
 });
