@@ -101,10 +101,11 @@ describe("BracketView results mode", () => {
         results={results} score={5} maxPossible={20} />
     );
     const summary = screen.getByTestId("score-summary-desktop");
-    expect(summary.textContent).toContain("Score:");
-    expect(summary.textContent).toContain("5 pts");
-    expect(summary.textContent).toContain("Max:");
-    expect(summary.textContent).toContain("20 pts");
+    expect(summary.textContent).toContain("Score");
+    expect(summary.textContent).toContain("5");
+    expect(summary.textContent).toContain("pts");
+    expect(summary.textContent).toContain("Max");
+    expect(summary.textContent).toContain("20");
   });
 
   it("does not show score summary when not in results mode", () => {
@@ -112,7 +113,7 @@ describe("BracketView results mode", () => {
       <BracketView matches={matches} picks={[]} isReadOnly={true}
         score={5} maxPossible={20} />
     );
-    expect(screen.queryByText(/Score:/)).toBeNull();
+    expect(screen.queryByTestId("score-summary-desktop")).toBeNull();
   });
 
   it("passes scoreSummary (not ProgressBar) as progressBar prop to RoundView in results mode", () => {
@@ -134,8 +135,9 @@ describe("BracketView results mode", () => {
         results={results} score={7} maxPossible={22} />
     );
     const summary = screen.getByTestId("score-summary-desktop");
-    expect(summary.textContent).toContain("7 pts");
-    expect(summary.textContent).toContain("22 pts");
+    expect(summary.textContent).toContain("7");
+    expect(summary.textContent).toContain("22");
+    expect(summary.textContent).toContain("pts");
   });
 });
 

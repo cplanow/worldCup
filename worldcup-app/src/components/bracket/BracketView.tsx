@@ -6,7 +6,14 @@ import { BracketTree } from "./BracketTree";
 import { RoundView } from "./RoundView";
 import { ProgressBar } from "./ProgressBar";
 import { Button } from "@/components/ui/button";
-import { computeBracketState, getCascadingClears, validatePick, classifyAllPicks, MAX_PICKS } from "@/lib/bracket-utils";
+import { cn } from "@/lib/utils";
+import {
+  computeBracketState,
+  getCascadingClears,
+  validatePick,
+  classifyAllPicks,
+  MAX_PICKS,
+} from "@/lib/bracket-utils";
 import { savePick, submitBracket } from "@/lib/actions/bracket";
 import type { Match, Pick } from "@/types";
 
@@ -19,7 +26,14 @@ interface BracketViewProps {
   maxPossible?: number;
 }
 
-export function BracketView({ matches, picks: initialPicks, isReadOnly, results, score, maxPossible }: BracketViewProps) {
+export function BracketView({
+  matches,
+  picks: initialPicks,
+  isReadOnly,
+  results,
+  score,
+  maxPossible,
+}: BracketViewProps) {
   const router = useRouter();
   const [localPicks, setLocalPicks] = useState<Pick[]>(initialPicks);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,7 +74,12 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
     // sides run the same pure getCascadingClears.
     let clearIds: number[] = [];
     if (currentPick) {
-      clearIds = getCascadingClears(matchId, currentPick.selectedTeam, localPicks, matches);
+      clearIds = getCascadingClears(
+        matchId,
+        currentPick.selectedTeam,
+        localPicks,
+        matches
+      );
     }
 
     // Snapshot the pre-tap state so we can roll back if the server rejects.
@@ -72,10 +91,20 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
       const existingIdx = updated.findIndex((p) => p.matchId === matchId);
       // userId is resolved server-side from the session; placeholder here
       // is only used while waiting for the server round-trip.
-      const newPick: Pick = { id: -1, userId: 0, matchId, selectedTeam: team, createdAt: "" };
+      const newPick: Pick = {
+        id: -1,
+        userId: 0,
+        matchId,
+        selectedTeam: team,
+        createdAt: "",
+      };
 
       if (existingIdx >= 0) {
-        return [...updated.slice(0, existingIdx), newPick, ...updated.slice(existingIdx + 1)];
+        return [
+          ...updated.slice(0, existingIdx),
+          newPick,
+          ...updated.slice(existingIdx + 1),
+        ];
       }
       return [...updated, newPick];
     });
@@ -113,75 +142,108 @@ export function BracketView({ matches, picks: initialPicks, isReadOnly, results,
     }
   }
 
+  // Submit CTA — uses the primitive Button (tokenized) and a token-aware
+  // disabled treatment. Active: brand CTA; disabled: sunken surface.
   const submitSection = !isReadOnly ? (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <Button
         type="button"
         onClick={handleSubmit}
         disabled={!isComplete || isSubmitting}
-        className={`w-full font-semibold text-base ${
-          isComplete && !isSubmitting
-            ? "bg-slate-900 text-white hover:bg-slate-800"
-            : "bg-slate-100 text-slate-400 cursor-not-allowed"
-        }`}
+        className={cn(
+          "w-full text-base font-semibold",
+          !(isComplete && !isSubmitting) &&
+            "cursor-not-allowed bg-surface-sunken text-text-subtle hover:bg-surface-sunken"
+        )}
       >
         {isSubmitting ? "Submitting..." : "Submit Bracket"}
       </Button>
+      {!isComplete && !isSubmitting && (
+        <p className="text-center text-xs text-text-muted">
+          {MAX_PICKS - pickCount} picks remaining
+        </p>
+      )}
       {submitError && (
-        <p className="text-sm text-red-500">{submitError}</p>
+        <p className="text-sm text-error" role="alert">
+          {submitError}
+        </p>
       )}
     </div>
   ) : null;
 
   const scoreSummary =
     isReadOnly && hasResults && score !== undefined && maxPossible !== undefined ? (
-      <p className="text-sm text-slate-500">
-        Score:{" "}
-        <span className="font-semibold text-slate-900">{score} pts</span>
-        {" - Max: "}
-        <span className="font-semibold text-slate-900">{maxPossible} pts</span>
-      </p>
+      <div className="flex items-baseline gap-4 rounded-xl border border-border bg-surface p-4 shadow-[var(--shadow-card)]">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
+            Score
+          </p>
+          <p className="font-display text-2xl font-bold text-text">
+            {score}
+            <span className="ml-1 text-sm font-medium text-text-muted">pts</span>
+          </p>
+        </div>
+        <div className="h-10 w-px bg-border" />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
+            Max
+          </p>
+          <p className="font-display text-2xl font-bold text-text-muted">
+            {maxPossible}
+            <span className="ml-1 text-sm font-medium text-text-muted">pts</span>
+          </p>
+        </div>
+      </div>
     ) : null;
 
   return (
-    <div>
+    <div className="space-y-4 animate-fade-in">
       {saveError && (
         <div
           data-testid="save-error-banner"
-          className="mx-4 mt-2 mb-4 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="mx-4 flex items-start justify-between gap-3 rounded-xl border border-error/30 bg-error-bg px-4 py-3 text-sm text-error shadow-[var(--shadow-card)] animate-slide-up"
           role="alert"
         >
-          <span>{saveError}</span>
+          <span className="font-medium">{saveError}</span>
           <button
             type="button"
             onClick={() => setSaveError(null)}
-            className="font-semibold text-red-700 hover:text-red-900"
+            className="shrink-0 font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             aria-label="Dismiss error"
           >
             Dismiss
           </button>
         </div>
       )}
-      <BracketTree
-        bracketState={bracketState}
-        onSelect={handleSelect}
-        disabled={isReadOnly}
-        mode={mode}
-        classifications={classifications}
-      />
+
+      <div className="px-4 md:px-0">
+        <BracketTree
+          bracketState={bracketState}
+          onSelect={handleSelect}
+          disabled={isReadOnly}
+          mode={mode}
+          classifications={classifications}
+        />
+      </div>
+
       {/* Desktop: progress + submit below the bracket tree (entry mode) */}
       {!isReadOnly && (
-        <div className="hidden md:block px-4 mt-6 max-w-sm space-y-3">
+        <div className="hidden md:block px-4 max-w-sm space-y-4 pt-2">
           <ProgressBar current={pickCount} total={MAX_PICKS} />
           {submitSection}
         </div>
       )}
+
       {/* Score summary (results mode) — desktop visible, also passed to mobile RoundView */}
       {scoreSummary && (
-        <div className="hidden md:block px-4 mt-6 max-w-sm" data-testid="score-summary-desktop">
+        <div
+          className="hidden md:block px-4 max-w-sm pt-2"
+          data-testid="score-summary-desktop"
+        >
           {scoreSummary}
         </div>
       )}
+
       <RoundView
         bracketState={bracketState}
         onSelect={handleSelect}
