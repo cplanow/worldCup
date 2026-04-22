@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { loginUser } from "@/lib/actions/auth";
+import {
+  glassInputClass,
+  glassSubmitClass,
+  glassSwitchClass,
+} from "./auth/authStyles";
+import { AuthErrorBanner } from "./auth/AuthErrorBanner";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -42,7 +48,10 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 rounded-2xl bg-white/10 backdrop-blur-sm p-6 border border-white/10">
+    <form
+      onSubmit={handleSubmit}
+      className="flex w-full flex-col gap-4 rounded-2xl border border-white/10 bg-white/10 p-6 shadow-[var(--shadow-elevated)] backdrop-blur-md animate-fade-in"
+    >
       <Input
         name="username"
         type="text"
@@ -50,7 +59,8 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
         required
         autoComplete="username"
         autoFocus
-        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
+        aria-label="Username"
+        className={glassInputClass}
       />
       <Input
         name="password"
@@ -58,22 +68,21 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
         placeholder="Password"
         required
         autoComplete="current-password"
-        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
+        aria-label="Password"
+        className={glassInputClass}
       />
-      {error && (
-        <p className="text-center text-sm text-red-400">{error}</p>
-      )}
+      <AuthErrorBanner message={error} onDismiss={() => setError("")} />
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="h-12 bg-[#D4AF37] text-base font-semibold text-[#0F2E23] hover:bg-[#C9A832] disabled:bg-white/10 disabled:text-white/30 rounded-xl"
+        className={glassSubmitClass}
       >
         {isSubmitting ? "Logging in..." : "Log In"}
       </Button>
       <button
         type="button"
         onClick={onSwitchToRegister}
-        className="text-sm text-[#8BAF9E] hover:text-[#D4AF37] transition-colors"
+        className={glassSwitchClass}
       >
         Create an account
       </button>

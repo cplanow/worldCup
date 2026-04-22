@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { consumePasswordResetToken } from "@/lib/actions/auth";
+import { AuthErrorBanner } from "./auth/AuthErrorBanner";
 
 interface Props {
   token: string;
@@ -50,30 +51,43 @@ export function ForgotPasswordResetForm({ token }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex w-full flex-col gap-4 rounded-2xl bg-white/10 backdrop-blur-sm p-6 border border-white/10"
+      className="flex w-full flex-col gap-4 animate-fade-in"
     >
-      <Input
-        name="newPassword"
-        type="password"
-        placeholder="New password"
-        required
-        autoComplete="new-password"
-        autoFocus
-        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
-      />
-      <Input
-        name="confirmPassword"
-        type="password"
-        placeholder="Confirm new password"
-        required
-        autoComplete="new-password"
-        className="h-12 text-center text-base bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#D4AF37] focus:ring-[#D4AF37]/30"
-      />
-      {error && <p className="text-center text-sm text-red-400">{error}</p>}
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-text-muted">New password</span>
+        <Input
+          name="newPassword"
+          type="password"
+          required
+          autoComplete="new-password"
+          autoFocus
+          className="h-11"
+        />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-text-muted">
+          Confirm new password
+        </span>
+        <Input
+          name="confirmPassword"
+          type="password"
+          required
+          autoComplete="new-password"
+          className="h-11"
+        />
+      </label>
+      {error && (
+        <div
+          role="alert"
+          className="rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error animate-fade-in"
+        >
+          {error}
+        </div>
+      )}
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="h-12 bg-[#D4AF37] text-base font-semibold text-[#0F2E23] hover:bg-[#C9A832] disabled:bg-white/10 disabled:text-white/30 rounded-xl"
+        className="h-11 bg-brand text-text-on-brand transition-transform duration-150 hover:bg-brand-hover active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? "Saving..." : "Save password"}
       </Button>
