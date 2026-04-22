@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LogOut, Settings } from "lucide-react";
 import { logoutUser } from "@/lib/actions/auth";
+import { Button } from "@/components/ui/button";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -14,19 +16,28 @@ export function LogoutButton() {
   }
 
   return (
-    <div className="flex items-center gap-4">
-      <Link
-        href="/settings/password"
-        className="text-sm text-[#8BAF9E] hover:text-[#C8DDD2] transition-colors"
+    <div className="flex items-center gap-1 sm:gap-2">
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="text-text-on-brand/80 hover:bg-white/10 hover:text-text-on-brand"
       >
-        Settings
-      </Link>
-      <button
+        <Link href="/settings/password" aria-label="Settings">
+          <Settings aria-hidden="true" />
+          <span className="hidden sm:inline">Settings</span>
+        </Link>
+      </Button>
+      <Button
         onClick={handleLogout}
-        className="text-sm text-[#8BAF9E] hover:text-[#C8DDD2] transition-colors"
+        variant="ghost"
+        size="sm"
+        className="text-text-on-brand/80 hover:bg-white/10 hover:text-text-on-brand"
+        aria-label="Log out"
       >
-        Log out
-      </button>
+        <LogOut aria-hidden="true" />
+        <span className="hidden sm:inline">Log out</span>
+      </Button>
     </div>
   );
 }

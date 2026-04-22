@@ -87,10 +87,11 @@ describe("AdminMatchCard", () => {
     expect(screen.getByText(/Result saved/)).toBeTruthy();
   });
 
-  it("resolved state: winner has emerald-100 style", () => {
+  it("resolved state: winner has success token style", () => {
     render(<AdminMatchCard match={baseMatch} result={resolvedResult} onConfirm={vi.fn()} />);
     const brazilBtn = screen.getByText("Brazil").closest("button");
-    expect(brazilBtn?.className).toContain("bg-emerald-100");
+    expect(brazilBtn?.className).toContain("bg-success-bg");
+    expect(brazilBtn?.className).toContain("text-success");
   });
 
   it("in correction mode, stored winner loses its highlight when a different team is selected", () => {
@@ -99,10 +100,10 @@ describe("AdminMatchCard", () => {
     fireEvent.click(screen.getByText("Mexico"));
     const brazilBtn = screen.getByText("Brazil").closest("button");
     const mexicoBtn = screen.getByText("Mexico").closest("button");
-    // Stored winner (Brazil) should NOT be highlighted green during correction
-    expect(brazilBtn?.className ?? "").not.toContain("bg-emerald-100");
-    // Newly selected team should be highlighted
-    expect(mexicoBtn?.className).toContain("bg-emerald-50");
+    // Stored winner (Brazil) should NOT be highlighted during correction
+    expect(brazilBtn?.className ?? "").not.toContain("bg-success-bg");
+    // Newly selected team should be highlighted (selection border)
+    expect(mexicoBtn?.className).toContain("border-success");
   });
 
   it("in correction mode, shows 'Update Result' button instead of 'Confirm Result'", () => {

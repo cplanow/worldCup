@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { toggleGroupStageLock } from "@/lib/actions/admin";
 
 interface GroupStageLockToggleProps {
@@ -13,33 +13,40 @@ export function GroupStageLockToggle({ initialLocked }: GroupStageLockToggleProp
   const router = useRouter();
   const [locked, setLocked] = useState(initialLocked);
   const [toggling, setToggling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleToggle() {
+  async function handleToggle(checked: boolean) {
     setToggling(true);
-    const result = await toggleGroupStageLock(!locked);
+    setError(null);
+    setLocked(checked);
+    const result = await toggleGroupStageLock(checked);
     if (result.success) {
       setLocked(result.data.groupStageLocked);
       router.refresh();
+    } else {
+      setLocked(!checked);
+      setError(result.error);
     }
     setToggling(false);
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
-      <div>
-        <p className="font-medium text-slate-900">Group Stage Picks</p>
-        <p className="text-sm text-slate-500">
-          {locked ? "Locked — users cannot modify group picks" : "Open — users can submit group picks"}
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-2 p-4">
+      <div className="min-w-0">
+        <p className="font-semibold text-text">Group stage picks</p>
+        <p className="mt-0.5 text-sm text-text-muted">
+          {locked
+            ? "Locked — users cannot modify group picks"
+            : "Open — users can submit group picks"}
         </p>
+        {error && <p className="mt-2 text-sm text-error">{error}</p>}
       </div>
-      <Button
-        onClick={handleToggle}
+      <Switch
+        checked={locked}
+        onCheckedChange={handleToggle}
         disabled={toggling}
-        variant={locked ? "outline" : "default"}
-        className={locked ? "" : "bg-red-600 hover:bg-red-700 text-white"}
-      >
-        {toggling ? "..." : locked ? "Unlock" : "Lock"}
-      </Button>
+        aria-label="Toggle group stage lock"
+      />
     </div>
   );
 }

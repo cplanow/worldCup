@@ -28,32 +28,24 @@ export function BracketLockToggle({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="mb-3 text-lg font-semibold text-slate-900">
-        Bracket Entry Control
-      </h2>
-      <div className="flex items-center gap-3">
-        <Switch
-          checked={isLocked}
-          onCheckedChange={handleToggle}
-          disabled={isPending}
-          aria-label="Toggle bracket lock"
-        />
-        <span
-          className={`text-sm ${
-            isLocked
-              ? "font-medium text-red-600"
-              : "text-slate-500"
-          }`}
-        >
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-2 p-4">
+      <div className="min-w-0">
+        <p className="font-semibold text-text">Bracket picks</p>
+        <p className="mt-0.5 text-sm text-text-muted">
           {isLocked
-            ? "Brackets are locked — no new picks allowed"
-            : "Brackets are open for entry"}
-        </span>
+            ? "Locked — no new bracket picks allowed"
+            : "Open — users can submit bracket picks"}
+        </p>
+        {error && (
+          <p className="mt-2 text-sm text-error">{error}</p>
+        )}
       </div>
-      {error && (
-        <p className="mt-2 text-sm text-red-500">{error}</p>
-      )}
+      <Switch
+        checked={isLocked}
+        onCheckedChange={handleToggle}
+        disabled={isPending}
+        aria-label="Toggle bracket lock"
+      />
     </div>
   );
 }

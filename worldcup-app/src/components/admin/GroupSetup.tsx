@@ -45,45 +45,71 @@ export function GroupSetup({ existingGroups }: GroupSetupProps) {
 
   return (
     <div>
-      <h3 className="text-base font-semibold text-slate-900 mb-3">Add Group</h3>
+      <h3 className="mb-3 font-display text-base font-semibold text-text">
+        Add group
+      </h3>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <Input
-          value={groupName}
-          onChange={(e) => setGroupName(e.target.value)}
-          placeholder="Group name (e.g. A)"
-          className="h-10"
-        />
-        {teams.map((team, i) => (
+        <div className="space-y-1.5">
+          <label
+            htmlFor="admin-group-name"
+            className="block text-xs font-medium text-text-muted"
+          >
+            Group name
+          </label>
           <Input
-            key={i}
-            value={team}
-            onChange={(e) => {
-              const newTeams = [...teams];
-              newTeams[i] = e.target.value;
-              setTeams(newTeams);
-            }}
-            placeholder={`Team ${i + 1}`}
+            id="admin-group-name"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="e.g. A"
             className="h-10"
           />
-        ))}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button
-          type="submit"
-          disabled={saving}
-          className="bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300"
-        >
-          {saving ? "Saving..." : "Save Group"}
-        </Button>
+        </div>
+        <div className="space-y-1.5">
+          <span className="block text-xs font-medium text-text-muted">
+            Teams (4 required)
+          </span>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {teams.map((team, i) => (
+              <Input
+                key={i}
+                value={team}
+                onChange={(e) => {
+                  const newTeams = [...teams];
+                  newTeams[i] = e.target.value;
+                  setTeams(newTeams);
+                }}
+                placeholder={`Team ${i + 1}`}
+                className="h-10"
+                aria-label={`Team ${i + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+        {error && <p className="text-sm text-error">{error}</p>}
+        <div className="flex justify-end">
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Save group"}
+          </Button>
+        </div>
       </form>
 
       {existingGroups.length > 0 && (
         <div className="mt-6 space-y-3">
-          <h3 className="text-base font-semibold text-slate-900">Existing Groups ({existingGroups.length}/12)</h3>
+          <h3 className="font-display text-base font-semibold text-text">
+            Existing groups ({existingGroups.length}/12)
+          </h3>
           <div className="grid gap-2 sm:grid-cols-2">
             {existingGroups.map((g) => (
-              <div key={g.id} className="rounded border border-slate-200 p-3">
-                <p className="font-medium text-slate-900 text-sm">Group {g.name}</p>
-                <p className="text-xs text-slate-500 mt-1">{g.teams.join(", ")}</p>
+              <div
+                key={g.id}
+                className="rounded-lg border border-border bg-surface-2 p-3"
+              >
+                <p className="font-display text-sm font-semibold text-text">
+                  Group {g.name}
+                </p>
+                <p className="mt-1 text-xs text-text-muted">
+                  {g.teams.join(", ")}
+                </p>
               </div>
             ))}
           </div>

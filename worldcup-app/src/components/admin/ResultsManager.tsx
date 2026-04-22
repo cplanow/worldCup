@@ -56,17 +56,17 @@ export function ResultsManager({ matches, initialResults }: ResultsManagerProps)
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error">
           {error}
         </div>
       )}
       {successMsg && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+        <div className="rounded-lg border border-success/30 bg-success-bg px-4 py-2 text-sm text-success">
           {successMsg}
         </div>
       )}
       {warning && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700">
+        <div className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-2 text-sm text-warning">
           {warning}
         </div>
       )}
@@ -77,17 +77,19 @@ export function ResultsManager({ matches, initialResults }: ResultsManagerProps)
         if (roundMatches.length === 0) return null;
         return (
           <div key={round}>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <h3 className="mb-3 font-display text-xs font-semibold uppercase tracking-widest text-text-muted">
               {ROUND_NAMES[round] ?? `Round ${round}`}
             </h3>
-            {roundMatches.map((match) => (
-              <AdminMatchCard
-                key={match.id}
-                match={match}
-                result={resultByMatchId.get(match.id) ?? null}
-                onConfirm={handleConfirm}
-              />
-            ))}
+            <div className="space-y-2">
+              {roundMatches.map((match) => (
+                <AdminMatchCard
+                  key={match.id}
+                  match={match}
+                  result={resultByMatchId.get(match.id) ?? null}
+                  onConfirm={handleConfirm}
+                />
+              ))}
+            </div>
           </div>
         );
       })}

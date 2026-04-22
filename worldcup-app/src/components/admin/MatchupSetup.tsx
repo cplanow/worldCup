@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { setupMatchup, deleteMatchup } from "@/lib/actions/admin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { Match } from "@/types";
 
 interface MatchupSetupProps {
@@ -31,9 +32,14 @@ export function MatchupSetup({ existingMatches }: MatchupSetupProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-medium text-slate-600">
-        {savedCount} of 16 matchups configured
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-text-muted">
+          {savedCount} of 16 matchups configured
+        </p>
+        <Badge variant={savedCount === 16 ? "success" : "default"}>
+          {savedCount}/16
+        </Badge>
+      </div>
       <div className="space-y-3">
         {Array.from({ length: 16 }, (_, i) => (
           <MatchupSlot
@@ -116,6 +122,7 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
 
   function handleDelete() {
     if (!match) return;
+    if (!confirm(`Delete matchup ${position}? Users' picks on this match will be cleared.`)) return;
     startTransition(async () => {
       const result = await deleteMatchup(match.id);
       if (result.success) {
@@ -130,11 +137,17 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
 
   if (isSaved) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-        <span className="w-8 text-sm font-semibold text-slate-400">{position}.</span>
-        <span className="flex-1 text-base font-medium text-slate-900">{match.teamA}</span>
-        <span className="text-sm text-slate-400">vs</span>
-        <span className="flex-1 text-base font-medium text-slate-900">{match.teamB}</span>
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3">
+        <span className="w-8 font-display text-sm font-semibold text-text-subtle">
+          {position}.
+        </span>
+        <span className="flex-1 min-w-0 truncate text-base font-medium text-text">
+          {match.teamA}
+        </span>
+        <span className="text-sm text-text-subtle">vs</span>
+        <span className="flex-1 min-w-0 truncate text-base font-medium text-text">
+          {match.teamB}
+        </span>
         <Button variant="outline" size="sm" onClick={handleEdit} disabled={isPending}>
           Edit
         </Button>
@@ -143,44 +156,48 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="w-8 text-sm font-semibold text-slate-400">{position}.</span>
+    <div className="rounded-lg border border-border bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
+        <span className="w-8 shrink-0 font-display text-sm font-semibold text-text-subtle">
+          {position}.
+        </span>
         <Input
           placeholder="Team A"
           value={state.teamA}
           onChange={(e) => setState((s) => ({ ...s, teamA: e.target.value, error: null }))}
-          className="flex-1 text-base"
+          className="flex-1 min-w-[8rem] text-base"
           disabled={isPending}
         />
-        <span className="text-sm text-slate-400">vs</span>
+        <span className="text-sm text-text-subtle">vs</span>
         <Input
           placeholder="Team B"
           value={state.teamB}
           onChange={(e) => setState((s) => ({ ...s, teamB: e.target.value, error: null }))}
-          className="flex-1 text-base"
+          className="flex-1 min-w-[8rem] text-base"
           disabled={isPending}
         />
-        <Button
-          onClick={handleSave}
-          disabled={isPending || !state.teamA.trim() || !state.teamB.trim()}
-          className="bg-slate-900 text-white hover:bg-slate-800"
-        >
-          {isPending ? "Saving..." : "Save"}
-        </Button>
-        {editing && (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={isPending}>
-            Cancel
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Button
+            onClick={handleSave}
+            disabled={isPending || !state.teamA.trim() || !state.teamB.trim()}
+            size="sm"
+          >
+            {isPending ? "Saving..." : "Save"}
           </Button>
-        )}
-        {editing && match && (
-          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isPending}>
-            Delete
-          </Button>
-        )}
+          {editing && (
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={isPending}>
+              Cancel
+            </Button>
+          )}
+          {editing && match && (
+            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isPending}>
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
       {state.error && (
-        <p className="mt-2 ml-11 text-sm text-red-600">{state.error}</p>
+        <p className="mt-2 text-sm text-error">{state.error}</p>
       )}
     </div>
   );

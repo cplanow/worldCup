@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface TabNavProps {
   isAdmin: boolean;
@@ -21,25 +22,34 @@ export function TabNav({ isAdmin }: TabNavProps) {
     : tabs;
 
   return (
-    <nav className="bg-[#0F2E23] border-b border-[#1A4A38]" aria-label="Main navigation">
-      <div className="flex">
-        {allTabs.map((tab) => {
-          const isActive = pathname === tab.href;
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`px-4 py-3 text-sm font-medium transition-colors ${
-                isActive
-                  ? "border-b-2 border-[#D4AF37] font-bold text-[#D4AF37]"
-                  : "text-[#8BAF9E] hover:text-[#C8DDD2]"
-              }`}
-              aria-current={isActive ? "page" : undefined}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
+    <nav
+      className="border-t border-white/10"
+      aria-label="Main navigation"
+    >
+      <div className="mx-auto max-w-[1120px] px-2 sm:px-4">
+        {/* Horizontal scroll on narrow viewports; snaps tabs flush on wider ones */}
+        <ul className="-mb-px flex gap-1 overflow-x-auto sm:gap-2">
+          {allTabs.map((tab) => {
+            const isActive = pathname === tab.href;
+            return (
+              <li key={tab.href} className="shrink-0">
+                <Link
+                  href={tab.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "relative inline-flex items-center whitespace-nowrap px-3 py-3 text-sm font-medium transition-colors sm:px-4",
+                    "border-b-2",
+                    isActive
+                      ? "border-accent text-accent font-semibold"
+                      : "border-transparent text-text-on-brand/70 hover:text-text-on-brand"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </nav>
   );
