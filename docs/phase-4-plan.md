@@ -1,8 +1,11 @@
 # Phase 4 Plan — UI Revamp + E2E Tests + Product Analytics
 
+**Status:** FINAL — ready for execution
 **Date:** 2026-04-21
 **Target ship:** Before June 11 kickoff (51 days runway)
 **Scope:** Three independent workstreams — bundle as one plan since they share engineering attention.
+
+All decisions in §1.7 are locked. All design tokens, type scale, motion language, and dark-mode palette are specified below. Execution can begin from this document without further stakeholder input.
 
 ---
 
@@ -348,13 +351,22 @@ Week 4  ────────────────────────
 
 Calendar time ~4 weeks with parallelization (UI can't fully parallelize with itself — same taste-judgment bottleneck — but tests and analytics fully parallel), ~7 weeks sequential. Kickoff is 51 days out; comfortable even if things slip.
 
-### Hard decisions / open questions
+### Decisions — locked
 
-1. ~~**Dark mode — in or out?**~~ IN. Doing it alongside the light-mode revamp is cheaper than a separate pass.
-2. **Visual regression tests — mandatory or optional?** Recommend mandatory given ground-up rework scope (the investment pays back on every future change, and catches regressions while we iterate on 10+ components).
-3. **Analytics admin page — SSR or client-side?** Recommend SSR for consistency with existing admin pages. No auth complications.
-4. **One AI tool or multiple?** Stitch is free Google Labs; v0 has a free tier. Minimal cost either way. Recommend: use Stitch for design exploration, v0 for code generation. Don't try to collapse to one tool — each does a different job.
-5. **What's the non-negotiable brand anchor?** Before 4B (Stitch design sprint), decide what CANNOT change. Strong candidates: Bricolage display font, forest-green brand color. Everything else on the table.
+All decisions below are made and baked into the plan. No further input needed from stakeholder before execution.
+
+1. **Dark mode: IN.** Built alongside the light-mode revamp as "mood mode" with curated palette for both. Token-driven from day one.
+2. **Visual regression tests: MANDATORY.** Playwright screenshot diffs in CI before we touch the first component. Cheap insurance while iterating on 10+ components.
+3. **Analytics admin page: SSR.** Consistent with existing admin pages, no auth complications, simpler to ship.
+4. **AI tool stack: Stitch + v0, not a single-tool collapse.** Stitch handles visual direction exploration; v0 handles Shadcn+Tailwind+React component generation. Skip Lovable/Bolt/Mocha (full-stack builders — wrong fit, we have backend).
+5. **Design sprint execution: Claude drives, not the stakeholder.** The research is done; the direction is codified in the Design Direction doc (`docs/design-direction.md`, see phase 4B). Stitch used if needed for specific visual exploration, but the aesthetic is already chosen.
+6. **Brand anchors (non-negotiable):**
+   - **Bricolage Grotesque** display font (now used via variable axis for fluid weight)
+   - **Forest green `#0F2E23`** as primary brand color
+   - **Gold `#D4AF37`** retained as accent (contrast-corrected pairings only)
+   - Everything else is in scope: type scale, spacing, body surface color, card patterns, motion language, dark-mode palette, navigation, error/success states.
+7. **Aesthetic direction:** modern sports-dashboard — dense but legible, warm-white body surface (Cloud Dancer–inspired `#FBFAF6`), dual-tone gradients on hero/card moments, neumorphic-lite card tactility, motion on state change (correct pick celebrates, cascade clears animate out), dark mode with forest + navy overlay rather than inversion, variable-font-driven hierarchy. Explicitly rejecting neo-brutalism, maximalism, claymorphism, and stock-Tailwind slate palettes.
+8. **Visual regression threshold:** Playwright `toHaveScreenshot({ maxDiffPixels: 50 })` per component. Tight enough to catch regressions, loose enough to tolerate subpixel rendering diffs.
 
 ---
 
