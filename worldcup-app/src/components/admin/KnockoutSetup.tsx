@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import {
   setActualTopScorer,
@@ -38,6 +39,7 @@ export function KnockoutSetup({
   const [savingAdvancers, setSavingAdvancers] = useState(false);
   const [savingScorer, setSavingScorer] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [seedConfirmOpen, setSeedConfirmOpen] = useState(false);
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
   function toggleAdvancer(groupId: number) {
@@ -77,9 +79,6 @@ export function KnockoutSetup({
   }
 
   async function seedBracket() {
-    if (!confirm("Auto-seed the Round of 32? This replaces any existing R32 matchups and clears bracket picks on them.")) {
-      return;
-    }
     setSeeding(true);
     setMessage(null);
     const result = await autoSeedR32();
@@ -188,7 +187,7 @@ export function KnockoutSetup({
           </p>
         </div>
         <div className="flex justify-end">
-          <Button onClick={seedBracket} disabled={seeding}>
+          <Button onClick={() => setSeedConfirmOpen(true)} disabled={seeding}>
             {seeding ? "Seeding..." : "Auto-seed R32"}
           </Button>
         </div>
@@ -204,6 +203,17 @@ export function KnockoutSetup({
           {message.text}
         </p>
       )}
+
+      <ConfirmDialog
+        open={seedConfirmOpen}
+        onOpenChange={setSeedConfirmOpen}
+        title="Auto-seed the Round of 32?"
+        description="This replaces any existing R32 matchups and clears all users' bracket picks on those matches. Group stage must be finalized first."
+        confirmLabel="Seed bracket"
+        destructive
+        loading={seeding}
+        onConfirm={seedBracket}
+      />
     </div>
   );
 }

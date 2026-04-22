@@ -5,6 +5,7 @@ import { setupMatchup, deleteMatchup } from "@/lib/actions/admin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Match } from "@/types";
 
 interface MatchupSetupProps {
@@ -82,6 +83,7 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
     error: null,
   });
   const [isPending, startTransition] = useTransition();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const isSaved = match !== null && !editing;
 
@@ -120,14 +122,14 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
     setEditing(true);
   }
 
-  function handleDelete() {
+  function performDelete() {
     if (!match) return;
-    if (!confirm(`Delete matchup ${position}? Users' picks on this match will be cleared.`)) return;
     startTransition(async () => {
       const result = await deleteMatchup(match.id);
       if (result.success) {
         setState({ teamA: "", teamB: "", error: null });
         setEditing(false);
+        setDeleteConfirmOpen(false);
         onDeleted(position);
       } else {
         setState((s) => ({ ...s, error: result.error }));
@@ -190,7 +192,7 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
             </Button>
           )}
           {editing && match && (
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isPending}>
+            <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={isPending}>
               Delete
             </Button>
           )}
@@ -199,6 +201,16 @@ function MatchupSlot({ position, match, onSaved, onDeleted }: MatchupSlotProps) 
       {state.error && (
         <p className="mt-2 text-sm text-error">{state.error}</p>
       )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title={`Delete matchup ${position}?`}
+        description="Users' picks on this match will be cleared. This can't be undone."
+        confirmLabel="Delete matchup"
+        destructive
+        loading={isPending}
+        onConfirm={performDelete}
+      />
     </div>
   );
 }

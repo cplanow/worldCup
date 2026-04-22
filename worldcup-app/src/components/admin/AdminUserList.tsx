@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { adminGenerateResetToken } from "@/lib/actions/admin";
 
 interface UserRow {
@@ -23,6 +24,7 @@ interface Props {
 
 export function AdminUserList({ users, baseUrl }: Props) {
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  const [pendingUser, setPendingUser] = useState<UserRow | null>(null);
   const [activeLink, setActiveLink] = useState<{
     userId: number;
     url: string;
@@ -30,14 +32,7 @@ export function AdminUserList({ users, baseUrl }: Props) {
   } | null>(null);
   const [error, setError] = useState("");
 
-  async function handleReset(user: UserRow) {
-    if (
-      !confirm(
-        `Generate a password reset link for ${user.username}? The link will expire in a short window and can only be viewed once.`
-      )
-    ) {
-      return;
-    }
+  async function performReset(user: UserRow) {
     setError("");
     setBusyUserId(user.id);
     try {
@@ -80,7 +75,7 @@ export function AdminUserList({ users, baseUrl }: Props) {
               </p>
             </div>
             <Button
-              onClick={() => handleReset(user)}
+              onClick={() => setPendingUser(user)}
               disabled={busyUserId === user.id}
               variant="destructive"
               size="sm"
@@ -128,6 +123,26 @@ export function AdminUserList({ users, baseUrl }: Props) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingUser !== null}
+        onOpenChange={(open) => !open && setPendingUser(null)}
+        title="Generate password reset link?"
+        description={
+          pendingUser
+            ? `A one-time link for ${pendingUser.username} will be created. It expires in 1 hour and you won't be able to see it again after this dialog closes.`
+            : ""
+        }
+        confirmLabel="Generate link"
+        destructive
+        loading={busyUserId === pendingUser?.id}
+        onConfirm={async () => {
+          if (pendingUser) {
+            await performReset(pendingUser);
+            setPendingUser(null);
+          }
+        }}
+      />
     </div>
   );
 }
