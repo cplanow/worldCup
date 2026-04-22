@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { adminGenerateResetToken } from "@/lib/actions/admin";
 
 interface UserRow {
@@ -29,6 +31,13 @@ export function AdminUserList({ users, baseUrl }: Props) {
   const [error, setError] = useState("");
 
   async function handleReset(user: UserRow) {
+    if (
+      !confirm(
+        `Generate a password reset link for ${user.username}? The link will expire in a short window and can only be viewed once.`
+      )
+    ) {
+      return;
+    }
     setError("");
     setBusyUserId(user.id);
     try {
@@ -48,59 +57,75 @@ export function AdminUserList({ users, baseUrl }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">Users</h3>
+    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="flex items-center justify-between border-b border-border bg-surface-2 px-4 py-2.5">
+        <p className="font-display text-sm font-semibold text-text">
+          Users
+        </p>
+        <Badge variant="default">{users.length}</Badge>
       </div>
-      <ul className="divide-y divide-slate-100">
+
+      <ul className="divide-y divide-border">
         {users.map((user) => (
           <li
             key={user.id}
-            className="flex items-center justify-between px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
           >
-            <span className="font-medium text-slate-900">{user.username}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium text-text">
+                {user.username}
+              </p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                Pool member
+              </p>
+            </div>
             <Button
               onClick={() => handleReset(user)}
               disabled={busyUserId === user.id}
-              className="h-8 text-xs bg-slate-100 text-slate-700 hover:bg-slate-200"
+              variant="destructive"
+              size="sm"
             >
               {busyUserId === user.id ? "Generating..." : "Reset password"}
             </Button>
           </li>
         ))}
         {users.length === 0 && (
-          <li className="px-4 py-6 text-center text-sm text-slate-500">
+          <li className="px-4 py-6 text-center text-sm text-text-muted">
             No users yet.
           </li>
         )}
       </ul>
 
       {error && (
-        <p className="border-t border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="border-t border-error/30 bg-error-bg px-4 py-3 text-sm text-error">
           {error}
         </p>
       )}
 
       {activeLink && (
-        <div className="border-t border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-xs font-semibold text-amber-900">
+        <div className="border-t border-warning/30 bg-warning-bg px-4 py-3">
+          <p className="text-xs font-semibold text-warning">
             Copy this link and send it to the user. It expires at{" "}
-            {new Date(activeLink.expiresAt).toLocaleString()}. You won't be
+            {new Date(activeLink.expiresAt).toLocaleString()}. You won&apos;t be
             able to see it again.
           </p>
-          <input
+          <Input
             readOnly
             value={activeLink.url}
             onFocus={(e) => e.currentTarget.select()}
-            className="mt-2 w-full rounded border border-amber-300 bg-white px-2 py-1 font-mono text-xs text-slate-800"
+            className="mt-2 font-mono text-xs"
+            aria-label="Password reset link"
           />
-          <button
-            type="button"
-            onClick={() => setActiveLink(null)}
-            className="mt-2 text-xs text-amber-800 underline"
-          >
-            Dismiss
-          </button>
+          <div className="mt-2 flex justify-end">
+            <Button
+              type="button"
+              onClick={() => setActiveLink(null)}
+              variant="ghost"
+              size="sm"
+            >
+              Dismiss
+            </Button>
+          </div>
         </div>
       )}
     </div>
