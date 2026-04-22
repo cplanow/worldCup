@@ -11,14 +11,16 @@ export default async function AppLayout({
   const isAdmin = isAdminUsername(user.username);
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="bg-[#0F2E23] px-4 py-3 flex items-center justify-between">
-        <h1 className="font-display text-xl font-bold tracking-tight text-[#D4AF37]">
-          worldCup
-        </h1>
-        <LogoutButton />
+    <div className="min-h-screen bg-bg">
+      <header className="bg-brand text-text-on-brand">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5">
+          <h1 className="text-display-sm tracking-tight text-accent">
+            worldCup
+          </h1>
+          <LogoutButton />
+        </div>
+        <TabNav isAdmin={isAdmin} />
       </header>
-      <TabNav isAdmin={isAdmin} />
       <main>{children}</main>
     </div>
   );
