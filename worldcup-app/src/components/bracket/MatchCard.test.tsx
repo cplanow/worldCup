@@ -21,7 +21,7 @@ describe("MatchCard — entry mode", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
-  it("shows emerald-50 class on selected team in entry mode", () => {
+  it("applies brand surface to the selected team in entry mode (active emphasis)", () => {
     render(
       <MatchCard
         matchId={1}
@@ -34,7 +34,25 @@ describe("MatchCard — entry mode", () => {
       />
     );
     const brazilBtn = screen.getByLabelText("Brazil wins");
-    expect(brazilBtn.className).toContain("bg-emerald-50");
+    // New design: selected button uses brand token, not emerald-50
+    expect(brazilBtn.className).toContain("bg-brand");
+    expect(brazilBtn.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("sets aria-pressed=false on the non-selected team", () => {
+    render(
+      <MatchCard
+        matchId={1}
+        teamA="Brazil"
+        teamB="Germany"
+        selectedTeam="Brazil"
+        disabled={false}
+        mode="entry"
+        onSelect={noop}
+      />
+    );
+    expect(screen.getByLabelText("Germany wins").getAttribute("aria-pressed"))
+      .toBe("false");
   });
 
   it("calls onSelect with matchId and team on click", async () => {
@@ -54,7 +72,7 @@ describe("MatchCard — entry mode", () => {
     expect(onSelect).toHaveBeenCalledWith(1, "Germany");
   });
 
-  it("renders TBD placeholder for null team", () => {
+  it("renders TBD placeholder for null teams", () => {
     render(
       <MatchCard
         matchId={1}
@@ -85,6 +103,24 @@ describe("MatchCard — entry mode", () => {
     expect((buttons[0] as HTMLButtonElement).disabled).toBe(true);
     expect((buttons[1] as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("muted emphasis uses surface-2 instead of brand for selected team", () => {
+    render(
+      <MatchCard
+        matchId={1}
+        teamA="Brazil"
+        teamB="Germany"
+        selectedTeam="Brazil"
+        disabled={false}
+        mode="entry"
+        onSelect={noop}
+        emphasis="muted"
+      />
+    );
+    const brazilBtn = screen.getByLabelText("Brazil wins");
+    expect(brazilBtn.className).toContain("bg-surface-2");
+    expect(brazilBtn.className).not.toContain("bg-brand ");
+  });
 });
 
 describe("MatchCard — results mode", () => {
@@ -96,16 +132,17 @@ describe("MatchCard — results mode", () => {
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
-  it("shows emerald-500 background for correct pick (selected row)", () => {
+  it("uses success-bg for correct pick (selected row)", () => {
     render(
       <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
         disabled={true} mode="results" classification="correct" onSelect={noop} />
     );
     const el = screen.getByLabelText("Brazil — correct pick");
-    expect(el.className).toContain("bg-emerald-500");
+    expect(el.className).toContain("bg-success-bg");
+    expect(el.className).toContain("text-success");
   });
 
-  it("shows checkmark ✓ icon for correct pick", () => {
+  it("shows checkmark ✓ for correct pick", () => {
     render(
       <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
         disabled={true} mode="results" classification="correct" onSelect={noop} />
@@ -113,13 +150,14 @@ describe("MatchCard — results mode", () => {
     expect(screen.getByLabelText("Brazil — correct pick").textContent).toContain("✓");
   });
 
-  it("shows red-500 background for wrong pick (selected row)", () => {
+  it("uses error-bg for wrong pick (selected row)", () => {
     render(
       <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Germany"
         disabled={true} mode="results" classification="wrong" onSelect={noop} />
     );
     const el = screen.getByLabelText("Germany — wrong pick");
-    expect(el.className).toContain("bg-red-500");
+    expect(el.className).toContain("bg-error-bg");
+    expect(el.className).toContain("text-text-subtle");
   });
 
   it("shows ✗ icon for wrong pick", () => {
@@ -140,22 +178,22 @@ describe("MatchCard — results mode", () => {
     expect(nameSpan).toBeTruthy();
   });
 
-  it("shows slate-300 background for pending pick (selected row)", () => {
+  it("uses surface-2 for pending pick (selected row)", () => {
     render(
       <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
         disabled={true} mode="results" classification="pending" onSelect={noop} />
     );
     const el = screen.getByLabelText("Brazil — pending");
-    expect(el.className).toContain("bg-slate-300");
+    expect(el.className).toContain("bg-surface-2");
   });
 
-  it("unselected team has white background in results mode", () => {
+  it("unselected team is muted (text-text-muted) in results mode", () => {
     render(
       <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
         disabled={true} mode="results" classification="correct" onSelect={noop} />
     );
     const el = screen.getByLabelText("Germany");
-    expect(el.className).toContain("bg-white");
+    expect(el.className).toContain("text-text-muted");
   });
 
   it("does not call onSelect when clicked in results mode", async () => {
@@ -183,9 +221,8 @@ describe("MatchCard — results mode", () => {
       <MatchCard matchId={1} teamA="Brazil" teamB="Germany" selectedTeam="Brazil"
         disabled={true} mode="results" onSelect={noop} />
     );
-    // No classification prop — should default to "pending" styling
     const el = screen.getByLabelText("Brazil — pending");
-    expect(el.className).toContain("bg-slate-300");
+    expect(el.className).toContain("bg-surface-2");
   });
 });
 
@@ -202,11 +239,10 @@ describe("MatchCard — readonly mode", () => {
         onSelect={noop}
       />
     );
-    // No interactive buttons in readonly mode
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
-  it("shows slate-100 class on selected team in readonly mode", () => {
+  it("tints selected team with surface-2 in readonly mode", () => {
     render(
       <MatchCard
         matchId={1}
@@ -219,26 +255,10 @@ describe("MatchCard — readonly mode", () => {
       />
     );
     const brazilEl = screen.getByLabelText("Brazil — your pick");
-    expect(brazilEl.className).toContain("bg-slate-100");
+    expect(brazilEl.className).toContain("bg-surface-2");
   });
 
-  it("does NOT show emerald-50 on selected team in readonly mode", () => {
-    render(
-      <MatchCard
-        matchId={1}
-        teamA="Brazil"
-        teamB="Germany"
-        selectedTeam="Brazil"
-        disabled={true}
-        mode="readonly"
-        onSelect={noop}
-      />
-    );
-    const brazilEl = screen.getByLabelText("Brazil — your pick");
-    expect(brazilEl.className).not.toContain("bg-emerald-50");
-  });
-
-  it("unselected team has white background in readonly mode", () => {
+  it("unselected team renders against the surface background in readonly mode", () => {
     render(
       <MatchCard
         matchId={1}
@@ -251,7 +271,7 @@ describe("MatchCard — readonly mode", () => {
       />
     );
     const germanyEl = screen.getByLabelText("Germany");
-    expect(germanyEl.className).toContain("bg-white");
+    expect(germanyEl.className).toContain("bg-surface");
   });
 
   it("does not call onSelect on click attempt in readonly mode", async () => {
@@ -267,7 +287,6 @@ describe("MatchCard — readonly mode", () => {
         onSelect={onSelect}
       />
     );
-    // divs won't fire click-based selection; clicking the text does nothing
     const brazilEl = screen.getByText("Brazil");
     await userEvent.click(brazilEl);
     expect(onSelect).not.toHaveBeenCalled();
