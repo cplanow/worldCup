@@ -13,13 +13,25 @@ export default async function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0F2E23] via-[#132F25] to-[#0A1F17]">
-      <main className="flex w-full max-w-sm flex-col items-center gap-8 px-6">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-gradient px-6 py-10">
+      {/* Subtle gold glow ornament — pure CSS, no JS */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-32 -right-24 h-[420px] w-[420px] rounded-full bg-accent/20 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 -left-24 h-[360px] w-[360px] rounded-full bg-accent/10 blur-3xl"
+      />
+
+      <main className="relative z-10 flex w-full max-w-sm flex-col items-center gap-10 animate-fade-in">
         <div className="text-center">
-          <h1 className="font-display text-5xl font-extrabold tracking-tight text-[#D4AF37]">
+          <h1 className="text-display-lg font-display text-accent">
             worldCup
           </h1>
-          <p className="mt-2 text-sm text-[#8BAF9E]">Bracket Pool 2026</p>
+          <p className="mt-3 text-sm font-medium uppercase tracking-[0.2em] text-text-on-brand/80">
+            Bracket Pool 2026
+          </p>
         </div>
         <AuthContainer />
       </main>
