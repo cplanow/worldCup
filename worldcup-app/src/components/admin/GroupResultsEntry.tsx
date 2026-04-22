@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { enterGroupResult } from "@/lib/actions/admin";
 
 interface GroupForResults {
@@ -66,21 +67,25 @@ export function GroupResultsEntry({ groups }: GroupResultsEntryProps) {
 
   return (
     <div>
-      <h3 className="text-base font-semibold text-slate-900 mb-3">Enter Group Results</h3>
-      <div className="flex flex-wrap gap-2 mb-4">
+      <h3 className="mb-3 font-display text-base font-semibold text-text">
+        Enter group results
+      </h3>
+      <div className="mb-4 flex flex-wrap gap-2">
         {groups.map((g) => {
           const hasResults = g.teams.every((t) => t.finalPosition != null);
+          const isSelected = selectedGroup === g.id;
           return (
             <button
               key={g.id}
               onClick={() => handleSelectGroup(g.id)}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${
-                selectedGroup === g.id
-                  ? "bg-slate-900 text-white"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
+                isSelected
+                  ? "bg-brand text-text-on-brand"
                   : hasResults
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+                  ? "bg-success-bg text-success hover:bg-success-bg/70"
+                  : "bg-surface-2 text-text hover:bg-surface-sunken"
+              )}
             >
               {g.name}
             </button>
@@ -89,39 +94,45 @@ export function GroupResultsEntry({ groups }: GroupResultsEntryProps) {
       </div>
 
       {group && (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Enter teams in finishing order (1st to 4th). Available: {group.teams.map((t) => t.teamName).join(", ")}
+        <div className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
+          <p className="text-sm text-text-muted">
+            Enter teams in finishing order (1st to 4th). Available:{" "}
+            <span className="text-text">
+              {group.teams.map((t) => t.teamName).join(", ")}
+            </span>
           </p>
-          {positions.map((pos, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-500 w-8">{i + 1}.</span>
-              <select
-                value={pos}
-                onChange={(e) => {
-                  const newPos = [...positions];
-                  newPos[i] = e.target.value;
-                  setPositions(newPos);
-                }}
-                className="flex-1 rounded border border-slate-200 px-3 py-2 text-sm"
-              >
-                <option value="">Select team</option>
-                {group.teams.map((t) => (
-                  <option key={t.teamName} value={t.teamName}>
-                    {t.teamName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300"
-          >
-            {saving ? "Saving..." : "Save Results"}
-          </Button>
+          <div className="space-y-2">
+            {positions.map((pos, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-8 shrink-0 font-display text-sm font-semibold text-text-subtle">
+                  {i + 1}.
+                </span>
+                <select
+                  value={pos}
+                  onChange={(e) => {
+                    const newPos = [...positions];
+                    newPos[i] = e.target.value;
+                    setPositions(newPos);
+                  }}
+                  aria-label={`Position ${i + 1}`}
+                  className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                >
+                  <option value="">Select team</option>
+                  {group.teams.map((t) => (
+                    <option key={t.teamName} value={t.teamName}>
+                      {t.teamName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          {error && <p className="text-sm text-error">{error}</p>}
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save results"}
+            </Button>
+          </div>
         </div>
       )}
     </div>

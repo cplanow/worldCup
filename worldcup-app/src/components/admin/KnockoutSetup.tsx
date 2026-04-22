@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   setActualTopScorer,
   setThirdPlaceAdvancers,
@@ -90,42 +94,52 @@ export function KnockoutSetup({
 
   return (
     <div className="space-y-6">
-      <section>
-        <h3 className="text-base font-semibold text-slate-900 mb-2">Golden Boot — Actual Top Scorer</h3>
-        <p className="text-xs text-slate-500 mb-2">
-          Enter after tournament finishes. Used as tiebreaker on the combined leaderboard.
-        </p>
-        <div className="flex gap-2">
-          <input
+      {/* Golden Boot */}
+      <Card variant="flat" padding="md">
+        <div className="mb-3">
+          <h3 className="font-display text-base font-semibold text-text">
+            Golden Boot — actual top scorer
+          </h3>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Enter after tournament finishes. Used as tiebreaker on the combined leaderboard.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
             type="text"
             value={topScorer}
             onChange={(e) => setTopScorer(e.target.value)}
             placeholder="e.g. Kylian Mbappé"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+            className="h-10 flex-1"
+            aria-label="Top scorer"
           />
-          <Button
-            onClick={saveScorer}
-            disabled={savingScorer}
-            className="bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300"
-          >
+          <Button onClick={saveScorer} disabled={savingScorer}>
             {savingScorer ? "Saving..." : "Save"}
           </Button>
         </div>
-      </section>
+      </Card>
 
-      <section>
-        <h3 className="text-base font-semibold text-slate-900 mb-2">
-          Third-Place Advancers — Select 8 of 12
-        </h3>
-        <p className="text-xs text-slate-500 mb-3">
-          Only available once all 12 groups have final results. Required before auto-seeding.
-        </p>
+      {/* Third-place advancers */}
+      <Card variant="flat" padding="md">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div>
+            <h3 className="font-display text-base font-semibold text-text">
+              Third-place advancers
+            </h3>
+            <p className="mt-0.5 text-xs text-text-muted">
+              Select exactly 8 of 12. Required before auto-seeding the bracket.
+            </p>
+          </div>
+          <Badge variant={advancers.size === 8 ? "success" : "default"}>
+            {advancers.size}/8
+          </Badge>
+        </div>
         {!allGroupsHaveResults && (
-          <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+          <div className="mb-3 rounded-lg border border-warning/30 bg-warning-bg p-3 text-xs text-warning">
             Some groups still need final positions entered.
           </div>
         )}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
           {groups.map((g) => {
             const selected = advancers.has(g.id);
             const disabled = !g.thirdPlaceTeam;
@@ -134,52 +148,58 @@ export function KnockoutSetup({
                 key={g.id}
                 onClick={() => toggleAdvancer(g.id)}
                 disabled={disabled}
-                className={`rounded-lg border p-2 text-left text-xs transition-colors ${
+                aria-pressed={selected}
+                className={cn(
+                  "rounded-lg border p-2 text-left text-xs transition-colors",
                   selected
-                    ? "border-[#D4AF37] bg-[#D4AF37]/10 text-[#8B7A2E]"
+                    ? "border-accent bg-accent/15 text-accent-strong"
                     : disabled
-                    ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
+                    ? "cursor-not-allowed border-border bg-surface-2 text-text-subtle"
+                    : "border-border bg-surface text-text hover:bg-surface-2"
+                )}
               >
-                <div className="font-semibold">Group {g.name}</div>
-                <div className="text-slate-500">{g.thirdPlaceTeam ?? "—"}</div>
+                <div className="font-display font-semibold">Group {g.name}</div>
+                <div className="mt-0.5 text-text-muted">
+                  {g.thirdPlaceTeam ?? "—"}
+                </div>
               </button>
             );
           })}
         </div>
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-slate-500">{advancers.size} of 8 selected</p>
+        <div className="mt-3 flex justify-end">
           <Button
             onClick={saveAdvancers}
             disabled={savingAdvancers || !allGroupsHaveResults}
-            className="bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300"
           >
-            {savingAdvancers ? "Saving..." : "Save Advancers"}
+            {savingAdvancers ? "Saving..." : "Save advancers"}
           </Button>
         </div>
-      </section>
+      </Card>
 
-      <section>
-        <h3 className="text-base font-semibold text-slate-900 mb-2">Auto-Seed Round of 32</h3>
-        <p className="text-xs text-slate-500 mb-3">
-          Generates 16 R32 matchups from group results + the 8 selected third-place advancers.
-          Uses a deterministic pairing rule — you can manually override any matchup after seeding.
-        </p>
-        <Button
-          onClick={seedBracket}
-          disabled={seeding}
-          className="bg-[#0F2E23] text-white hover:bg-[#1A4A38] disabled:bg-slate-300"
-        >
-          {seeding ? "Seeding..." : "Auto-Seed R32"}
-        </Button>
-      </section>
+      {/* Auto seed */}
+      <Card variant="flat" padding="md">
+        <div className="mb-3">
+          <h3 className="font-display text-base font-semibold text-text">
+            Auto-seed Round of 32
+          </h3>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Generates 16 R32 matchups from group results + the 8 selected third-place advancers.
+            Uses a deterministic pairing rule — you can manually override any matchup after seeding.
+          </p>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={seedBracket} disabled={seeding}>
+            {seeding ? "Seeding..." : "Auto-seed R32"}
+          </Button>
+        </div>
+      </Card>
 
       {message && (
         <p
-          className={`text-sm ${
-            message.kind === "error" ? "text-red-600" : "text-emerald-700"
-          }`}
+          className={cn(
+            "text-sm",
+            message.kind === "error" ? "text-error" : "text-success"
+          )}
         >
           {message.text}
         </p>
