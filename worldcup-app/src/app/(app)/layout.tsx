@@ -1,5 +1,6 @@
 import { TabNav } from "@/components/navigation/TabNav";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { requireSessionOrRedirect, isAdminUsername } from "@/lib/session";
 
 export default async function AppLayout({
@@ -17,7 +18,10 @@ export default async function AppLayout({
           <h1 className="text-display-sm tracking-tight text-accent">
             worldCup
           </h1>
-          <LogoutButton />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <LogoutButton />
+          </div>
         </div>
         <TabNav isAdmin={isAdmin} />
       </header>
