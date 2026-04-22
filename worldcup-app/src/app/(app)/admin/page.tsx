@@ -9,6 +9,8 @@ import { GroupResultsEntry } from "@/components/admin/GroupResultsEntry";
 import { GroupStageLockToggle } from "@/components/admin/GroupStageLockToggle";
 import { KnockoutSetup } from "@/components/admin/KnockoutSetup";
 import { AdminUserList } from "@/components/admin/AdminUserList";
+import { Card } from "@/components/ui/card";
+import { SectionHeader } from "@/components/ui/section-header";
 import { db } from "@/db";
 import { groups, groupTeams, users } from "@/db/schema";
 import { asc } from "drizzle-orm";
@@ -69,44 +71,80 @@ export default async function AdminPage() {
     );
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
-      <h1 className="mb-6 text-2xl font-bold text-slate-900">
-        Tournament Setup
-      </h1>
-      <BracketLockToggle initialLocked={config.isLocked} />
-      <div className="mt-6">
-        <MatchupSetup existingMatches={allMatches} />
-      </div>
-      <div className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Match Results</h2>
-        <ResultsManager matches={allMatches} initialResults={allResults} />
-      </div>
-      <div className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Group Stage</h2>
-        <GroupStageLockToggle initialLocked={config.groupStageLocked} />
-        <div className="mt-4">
-          <GroupSetup existingGroups={groupsWithTeams} />
-        </div>
-        {allGroups.length > 0 && (
-          <div className="mt-6">
-            <GroupResultsEntry groups={groupsForResults} />
-          </div>
-        )}
-      </div>
-      {allGroups.length === 12 && (
-        <div className="mt-8">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Knockout Stage Setup</h2>
-          <KnockoutSetup
-            groups={groupsForKnockout}
-            initialAdvancers={initialAdvancers}
-            initialTopScorer={config.actualTopScorer}
-            allGroupsHaveResults={allGroupsHaveResults}
+    <div className="mx-auto max-w-[1120px] px-4 py-8 sm:px-6 sm:py-10">
+      <SectionHeader
+        title="Tournament Setup"
+        subtitle="Admin controls for matchups, results, groups, and users."
+        size="lg"
+      />
+
+      <div className="space-y-6">
+        <Card variant="default" padding="lg">
+          <SectionHeader
+            title="Bracket controls"
+            subtitle="Open or lock the bracket for user entry."
+            size="sm"
           />
-        </div>
-      )}
-      <div className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">User Management</h2>
-        <AdminUserList users={allUsers} baseUrl={baseUrl} />
+          <BracketLockToggle initialLocked={config.isLocked} />
+        </Card>
+
+        <Card variant="default" padding="lg">
+          <SectionHeader
+            title="Matchups"
+            subtitle="Configure the 16 Round-of-32 pairings."
+            size="sm"
+          />
+          <MatchupSetup existingMatches={allMatches} />
+        </Card>
+
+        <Card variant="default" padding="lg">
+          <SectionHeader
+            title="Match results"
+            subtitle="Record or correct winners as matches conclude."
+            size="sm"
+          />
+          <ResultsManager matches={allMatches} initialResults={allResults} />
+        </Card>
+
+        <Card variant="default" padding="lg">
+          <SectionHeader
+            title="Group stage"
+            subtitle="Set up groups, enter final standings, and control picks."
+            size="sm"
+          />
+          <div className="space-y-6">
+            <GroupStageLockToggle initialLocked={config.groupStageLocked} />
+            <GroupSetup existingGroups={groupsWithTeams} />
+            {allGroups.length > 0 && (
+              <GroupResultsEntry groups={groupsForResults} />
+            )}
+          </div>
+        </Card>
+
+        {allGroups.length === 12 && (
+          <Card variant="default" padding="lg">
+            <SectionHeader
+              title="Knockout stage setup"
+              subtitle="Golden Boot, third-place advancers, and R32 auto-seed."
+              size="sm"
+            />
+            <KnockoutSetup
+              groups={groupsForKnockout}
+              initialAdvancers={initialAdvancers}
+              initialTopScorer={config.actualTopScorer}
+              allGroupsHaveResults={allGroupsHaveResults}
+            />
+          </Card>
+        )}
+
+        <Card variant="default" padding="lg">
+          <SectionHeader
+            title="User management"
+            subtitle="Review pool members and generate password reset links."
+            size="sm"
+          />
+          <AdminUserList users={allUsers} baseUrl={baseUrl} />
+        </Card>
       </div>
     </div>
   );

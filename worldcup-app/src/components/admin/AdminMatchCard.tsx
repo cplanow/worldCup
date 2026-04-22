@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { Match, Result } from "@/types";
 
 interface AdminMatchCardProps {
@@ -51,71 +54,81 @@ export function AdminMatchCard({ match, result, onConfirm, onCancel }: AdminMatc
     // Suppress winner highlight when in correction mode (selectedTeam is set)
     const isWinner = isResolved && !selectedTeam && result!.winner === team;
 
-    if (isWinner) return "bg-emerald-100 text-emerald-800 border border-emerald-300";
-    if (isSelected) return "bg-emerald-50 border-2 border-emerald-400 text-emerald-800";
-    return "bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100";
+    if (isWinner)
+      return "bg-success-bg text-success border border-success/40";
+    if (isSelected)
+      return "bg-success-bg/70 border-2 border-success text-success";
+    return "bg-surface-2 border border-border text-text hover:bg-surface-sunken";
   };
 
   return (
     <div
-      className={`mb-2 rounded-lg p-3 ${
-        isResolved ? "border border-slate-200" : "border-2 border-slate-300"
-      }`}
+      className={cn(
+        "mb-2 rounded-lg border bg-surface p-3 transition-colors",
+        isResolved ? "border-border" : "border-border-strong"
+      )}
     >
       <div className="flex items-center gap-2">
         <button
           onClick={() => handleTeamClick(match.teamA)}
           disabled={!hasTeams || isSubmitting}
-          className={`flex-1 rounded py-2 px-3 text-center text-sm font-medium transition-colors disabled:cursor-default ${getTeamStyle(match.teamA)}`}
+          className={cn(
+            "flex-1 rounded-md py-2 px-3 text-center text-sm font-medium transition-colors disabled:cursor-default",
+            getTeamStyle(match.teamA)
+          )}
         >
           {teamAName}
         </button>
-        <span className="text-xs font-medium text-slate-400">vs</span>
+        <span className="text-xs font-medium text-text-subtle">vs</span>
         <button
           onClick={() => handleTeamClick(match.teamB)}
           disabled={!hasTeams || isSubmitting}
-          className={`flex-1 rounded py-2 px-3 text-center text-sm font-medium transition-colors disabled:cursor-default ${getTeamStyle(match.teamB)}`}
+          className={cn(
+            "flex-1 rounded-md py-2 px-3 text-center text-sm font-medium transition-colors disabled:cursor-default",
+            getTeamStyle(match.teamB)
+          )}
         >
           {teamBName}
         </button>
       </div>
 
       {isResolved && !selectedTeam && (
-        <p className="mt-1.5 text-center text-xs text-slate-500">
-          ✓ Result saved — tap a team to correct
+        <p className="mt-2 text-center text-xs text-text-muted">
+          Result saved — tap a team to correct
         </p>
       )}
 
       {!isResolved && !selectedTeam && hasTeams && (
-        <p className="mt-1.5 text-center">
-          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-500">
+        <p className="mt-2 text-center">
+          <Badge variant="default" size="sm">
             No result
-          </span>
+          </Badge>
         </p>
       )}
 
       {!hasTeams && (
-        <p className="mt-1.5 text-center text-xs text-slate-400">
+        <p className="mt-2 text-center text-xs text-text-subtle">
           Teams TBD — advance winners from previous rounds
         </p>
       )}
 
       {selectedTeam && (
-        <div className="mt-2 flex gap-2">
-          <button
+        <div className="mt-3 flex gap-2">
+          <Button
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="flex-1 rounded bg-slate-900 py-2 px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="flex-1"
           >
             {isSubmitting ? "Saving…" : isResolved ? "Update Result" : "Confirm Result"}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleCancel}
             disabled={isSubmitting}
-            className="flex-1 rounded border border-slate-200 bg-white py-2 px-4 text-sm font-medium text-slate-700"
+            variant="outline"
+            className="flex-1"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       )}
     </div>
