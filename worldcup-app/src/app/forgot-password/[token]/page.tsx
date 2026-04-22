@@ -3,6 +3,9 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ForgotPasswordResetForm } from "@/components/ForgotPasswordResetForm";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader } from "@/components/ui/section-header";
+import { Badge } from "@/components/ui/badge";
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -33,33 +36,56 @@ export default async function ForgotPasswordPage({ params }: PageProps) {
     Number.isFinite(expiresAt) &&
     expiresAt > now;
 
-  if (!valid) {
-    return (
-      <div className="min-h-screen bg-[#0F2E23] flex items-center justify-center px-4">
-        <div className="max-w-md rounded-2xl bg-white/10 p-8 text-center backdrop-blur-sm">
-          <h1 className="font-display text-2xl font-bold text-[#D4AF37]">
-            Link invalid
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-gradient px-6 py-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-32 -right-24 h-[420px] w-[420px] rounded-full bg-accent/20 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 -left-24 h-[360px] w-[360px] rounded-full bg-accent/10 blur-3xl"
+      />
+
+      <main className="relative z-10 w-full max-w-md animate-fade-in">
+        <div className="mb-6 text-center">
+          <h1 className="text-display-md font-display text-accent">
+            Reset password
           </h1>
-          <p className="mt-3 text-sm text-white/80">
-            This password reset link has expired or already been used. Ask the
-            pool admin for a fresh one.
+          <p className="mt-2 text-sm text-text-on-brand/80">
+            worldCup Bracket Pool 2026
           </p>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-[#0F2E23] flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="font-display mb-2 text-center text-3xl font-bold text-[#D4AF37]">
-          Set a new password
-        </h1>
-        <p className="mb-6 text-center text-sm text-white/70">
-          You'll be signed in automatically after saving.
-        </p>
-        <ForgotPasswordResetForm token={token} />
-      </div>
+        {valid ? (
+          <Card padding="lg">
+            <SectionHeader
+              size="sm"
+              title="Set your new password"
+              subtitle="You'll be signed in automatically after saving."
+              action={<Badge variant="success">Link valid</Badge>}
+            />
+            <CardContent>
+              <ForgotPasswordResetForm token={token} />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card padding="lg">
+            <SectionHeader
+              size="sm"
+              title="Link invalid or expired"
+              subtitle="This reset link has already been used or has expired."
+              action={<Badge variant="error">Expired</Badge>}
+            />
+            <CardContent>
+              <p className="text-sm text-text-muted">
+                Ask the pool admin for a fresh reset link. For security, reset
+                links are single-use and only work for a limited time.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </main>
     </div>
   );
 }
