@@ -82,28 +82,27 @@
   --radius: 0.75rem;
 
   /* Surface */
-  --bg:             #FBFAF6;  /* warm ivory page background */
+  --bg:             #F8FAFC;  /* slate-50 — clean cool white */
   --surface:        #FFFFFF;  /* card foreground */
-  --surface-2:      #F5F4EF;  /* subtle alt (headers, disabled) */
-  --surface-sunken: #EEECE4;  /* deeper alt (nav inactive, wells) */
+  --surface-2:      #F1F5F9;  /* slate-100 — alt (headers, disabled) */
+  --surface-sunken: #E2E8F0;  /* slate-200 — nav inactive, wells */
 
-  /* Brand — forest green */
-  --brand:         #0F2E23;
-  --brand-hover:   #1A4A38;
-  --brand-muted:   #2D5F4E;
+  /* Brand — deep slate-blue (near-black navy). Sports-data aesthetic. */
+  --brand:         #0F172A;  /* slate-900 */
+  --brand-hover:   #1E293B;  /* slate-800 */
+  --brand-muted:   #334155;  /* slate-700 */
 
-  /* Accent — gold. accent-strong is the contrast-safe variant for use on
-     surfaces other than brand-colored backgrounds (C: 4.87 on white). */
-  --accent:        #D4AF37;
-  --accent-hover:  #C9A832;
-  --accent-strong: #8B6914;  /* passes AA on white (4.87:1) — use for text/small */
+  /* Accent — electric cyan. Pops against the deep slate brand. */
+  --accent:        #06B6D4;  /* cyan-500 */
+  --accent-hover:  #0891B2;  /* cyan-600 */
+  --accent-strong: #0E7490;  /* cyan-700 — passes AA on white (4.66:1) for text */
 
   /* Semantic — all pairings contrast-verified */
   --success:    #047857;  /* emerald-700 — 4.75 on white */
   --success-bg: #ECFDF5;
   --warning:    #B45309;  /* amber-700 — 5.32 on white */
   --warning-bg: #FFFBEB;
-  --error:      #B91C1C;  /* red-700 — 6.93 on white, was ef4444 which failed AA */
+  --error:      #B91C1C;  /* red-700 — 6.93 on white */
   --error-bg:   #FEF2F2;
   --info:       #1D4ED8;  /* blue-700 — 7.56 on white */
   --info-bg:    #EFF6FF;
@@ -112,37 +111,41 @@
   --text:            #0F172A;  /* slate-900 — primary body */
   --text-muted:      #475569;  /* slate-600 — 7.22 on white, passes AAA */
   --text-subtle:     #64748B;  /* slate-500 — 4.78 on white, passes AA */
-  --text-on-brand:   #FFFFFF;  /* white on forest — 13.7:1 */
-  --text-on-accent:  #0F2E23;  /* forest on gold — 7.87:1 */
+  --text-on-brand:   #FFFFFF;  /* white on slate-900 — 18.7:1 */
+  --text-on-accent:  #0F172A;  /* slate-900 on cyan — passes AA (5.8:1) */
 
   /* Borders */
   --border:        #E2E8F0;  /* slate-200 */
   --border-strong: #CBD5E1;  /* slate-300 */
 
-  /* Focus ring */
-  --ring: #D4AF37;
+  /* Focus ring — cyan */
+  --ring: #06B6D4;
 }
 
 /* ============================================================================
  * Dark mode — "mood mode" per 2026 trend: designed palette, not inversion.
- * Forest green stays the brand; deeper forest becomes the background.
+ * Brand stays deep slate (header reads as dark navy band); accent stays cyan
+ * (electric pop on the dark surface). NEVER collapse brand and accent into
+ * the same hue — the active-tab-on-brand-header pattern requires contrast
+ * between the two.
  * ========================================================================= */
 .dark {
-  /* Surface — deeper forests for background, warmer ivory-green for cards */
-  --bg:             #0A1F17;  /* darker than brand for depth */
-  --surface:        #132F25;  /* card — slightly lifted from bg */
-  --surface-2:      #1A3A2E;  /* alt surface */
-  --surface-sunken: #071813;
+  /* Surface — very dark slate, warmer than pure black */
+  --bg:             #020617;  /* slate-950 — page background */
+  --surface:        #0F172A;  /* slate-900 — cards lift from bg */
+  --surface-2:      #1E293B;  /* slate-800 — alt surface */
+  --surface-sunken: #000000;  /* absolute black for sunken wells */
 
-  /* Brand — shifted lighter so "brand-colored" UI still reads as the highlight.
-     In dark mode the brand and bg are close in hue; brand becomes a ligher tint. */
-  --brand:         #D4AF37;  /* gold becomes the "brand" highlight in dark mode */
-  --brand-hover:   #E3C040;
-  --brand-muted:   #8B7A2E;
+  /* Brand — stays deep slate so header / primary CTA keeps identity.
+     Shifts slightly lighter than the bg so it reads as a distinct band. */
+  --brand:         #1E293B;  /* slate-800 */
+  --brand-hover:   #334155;  /* slate-700 */
+  --brand-muted:   #475569;  /* slate-600 */
 
-  --accent:        #D4AF37;
-  --accent-hover:  #E3C040;
-  --accent-strong: #F2D26A;  /* lighter gold for small text on dark surfaces */
+  /* Accent — cyan stays electric. Shifted lighter for dark-bg contrast. */
+  --accent:        #22D3EE;  /* cyan-400 */
+  --accent-hover:  #67E8F9;  /* cyan-300 */
+  --accent-strong: #67E8F9;  /* cyan-300 for small text on dark surfaces */
 
   /* Semantic — shifted for dark backgrounds */
   --success:    #34D399;  /* emerald-400 — passes AA on dark bg */
@@ -158,8 +161,8 @@
   --text:           #F1F5F9;  /* slate-100 — 14.8 on bg */
   --text-muted:     #CBD5E1;  /* slate-300 — 9.7 on bg */
   --text-subtle:    #94A3B8;  /* slate-400 — 5.2 on bg */
-  --text-on-brand:  #0F2E23;  /* forest on gold */
-  --text-on-accent: #0F2E23;
+  --text-on-brand:  #F1F5F9;  /* near-white on slate-800 — 11.1:1 */
+  --text-on-accent: #0F172A;  /* slate-900 on cyan-400 — passes AA (8.8:1) */
 
   --border:        rgb(255 255 255 / 0.08);
   --border-strong: rgb(255 255 255 / 0.15);
@@ -266,6 +269,29 @@
     backdrop-filter: blur(12px) saturate(140%);
     -webkit-backdrop-filter: blur(12px) saturate(140%);
     border: 1px solid color-mix(in srgb, var(--border) 100%, transparent);
+  }
+}
+
+/* ============================================================================
+ * Gradient overrides — update the brand-gradient utility for the new palette.
+ * ========================================================================= */
+@layer utilities {
+  .bg-brand-gradient {
+    background-image: linear-gradient(
+      135deg,
+      var(--brand) 0%,
+      var(--brand-hover) 55%,
+      var(--accent-hover) 100%
+    );
+  }
+
+  .bg-accent-gradient {
+    background-image: linear-gradient(
+      135deg,
+      #22D3EE 0%,
+      #06B6D4 55%,
+      #0891B2 100%
+    );
   }
 }
 
